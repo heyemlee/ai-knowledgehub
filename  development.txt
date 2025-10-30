@@ -1,0 +1,124 @@
+项目目标
+
+构建一个基于 OpenAI 大语言模型 的企业级知识库系统，
+实现员工通过网页端（Next.js）访问公司内部知识内容，
+AI 根据企业资料和语义检索自动生成高质量答案。
+
+🔧 技术总览
+模块	技术选型
+前端框架	Next.js 14（React + Server Components）
+前端部署	Vercel（自动CI/CD，CDN加速）
+后端框架	FastAPI（Python）
+向量数据库	Qdrant Cloud
+模型服务	OpenAI API（GPT-4-Turbo / GPT-3.5-Turbo）
+云平台	AWS（EC2 + S3 + Route53 + CloudWatch）
+存储服务	AWS S3（文档与备份）
+认证与安全	JWT / AWS Cognito / HTTPS（ACM证书）
+数据管控	私有API + IAM权限 + 日志监控
+二、系统架构设计
+1️⃣ 总体结构
+[员工浏览器]
+      ↓ HTTPS
+[Vercel 前端 (Next.js)]
+      ↓ REST API / WebSocket
+[AWS EC2 后端 (FastAPI)]
+      ├─ 调用 OpenAI 模型 (GPT-4)
+      ├─ 检索 Qdrant Cloud 向量数据
+      ├─ 访问 S3 文档（PDF/Word）
+      └─ 记录日志 → CloudWatch
+
+2️⃣ 数据流逻辑
+
+用户输入问题 → 前端发起 HTTPS 请求
+
+后端接收问题，生成向量查询
+
+向 Qdrant Cloud 检索语义最相关文档段落
+
+拼接上下文 → 调用 OpenAI ChatGPT API
+
+模型生成回答 → 返回前端显示
+
+三、功能模块划分
+模块	功能描述
+用户界面层	Next.js 页面、登录入口、问题输入、回答展示、加载动画
+API 网关层	HTTPS 请求管理、CORS、安全验证、流量控制
+检索层（RAG）	文档嵌入、向量检索、相似度排序
+生成层（LLM）	基于 GPT-4 模型生成自然语言回答
+知识文档层	管理 PDF/Word/Excel 原始资料
+存储层	S3 文档存储 + Qdrant 向量存储
+安全与监控	JWT 登录、API Key 限流、AWS CloudWatch 日志监控
+四、开发阶段规划
+阶段	内容	输出
+阶段1：架构与环境	AWS账号配置、Vercel连接GitHub、域名解析、证书部署	基础环境搭建完成
+阶段2：后端核心开发	FastAPI接口、Qdrant检索逻辑、OpenAI调用、JWT认证	API原型
+阶段3：前端开发	Next.js UI、API集成、响应式界面、错误处理	前端Demo
+阶段4：文档嵌入流程	上传文档→向量化→存入Qdrant	数据入库流程完成
+阶段5：联调与优化	前后端联调、模型参数调优、语义准确度测试	MVP可用版本
+阶段6：监控与安全	接入CloudWatch、API限流、日志审计	安全上线版本
+阶段7：正式上线	Vercel发布 + AWS后端部署	内部访问开放
+五、AWS 云资源规划
+服务	用途	说明
+EC2	运行后端Docker（FastAPI）	2核4G实例即可
+S3	文档与嵌入数据存储	支持版本控制与备份
+Route53	域名管理（ai.abc.com / api.abc.com）	与Vercel/AWS互联
+CloudWatch	日志与监控	监控API流量与错误
+IAM	权限与API密钥管理	限制访问范围
+六、安全与权限设计
+
+HTTPS 全站加密（Let’s Encrypt / AWS ACM）
+
+JWT 用户认证：员工登录后获取临时访问Token
+
+API Key 限制：后端验证来源、请求次数
+
+Qdrant API Key：服务端调用，前端不可见
+
+S3 权限控制：仅后端拥有读权限
+
+日志留存与报警：异常调用自动记录到 CloudWatch
+
+七、知识库管理流程
+
+上传文档 → 存入 S3
+
+后端触发解析 → 文本提取 + 切块
+
+调用 OpenAI Embedding API → 生成向量
+
+向量写入 Qdrant Cloud（附带文件元信息）
+
+用户查询时 → 检索匹配 + 组合回答
+
+八、前端设计要点
+模块	内容
+页面结构	首页（问答界面）、登录页、知识上传页（管理员）
+状态管理	React Hooks / Zustand
+数据交互	Axios 调用后端 API
+UI组件	TailwindCSS + shadcn/ui
+动效与体验	打字机效果、实时流式响应
+响应式支持	兼容手机、平板、桌面端
+部署策略	GitHub → Vercel 自动构建与发布
+九、测试与上线
+测试类型	说明
+单元测试	FastAPI 接口单元测试
+集成测试	前后端联调验证
+性能测试	高并发访问模拟（Locust）
+安全测试	Token过期验证、CORS攻击防御
+上线流程	AWS 部署 Docker → Route53 DNS 解析 → Vercel 发布前端
+十、运维与优化
+
+监控指标：API响应时间、调用次数、错误率
+
+日志管理：FastAPI + CloudWatch 集成
+
+模型优化：温度、Top-p 参数调试
+
+数据扩展：Qdrant 集群扩容、S3 版本控制
+
+定期更新：每周同步新文档入库
+
+备份策略：S3 自动备份 + Qdrant Snapshot
+
+
+开发的时候用 .env + MODE 来区分开发/生产模式
