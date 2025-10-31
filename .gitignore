@@ -54,3 +54,31 @@ tmp/
 temp/
 *.tmp
 
+# Database files
+*.db
+*.sqlite
+*.sqlite3
+
+# Sensitive files
+*.key
+*.pem
+*.p12
+*.jks
+*.secret
+*.credentials
+
+# Document files (exclude README and guide files)
+documents/*.docx
+documents/*.doc
+documents/*.pdf
+documents/*.xlsx
+documents/*.xls
+documents/*.txt
+documents/*.pptx
+documents/*.ppt
+# Keep README.md and UPDATE_GUIDE.md in documents folder
+!documents/README.md
+!documents/UPDATE_GUIDE.md
+!documents/.gitkeep
+
+Todo.md

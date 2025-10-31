@@ -41,6 +41,22 @@ class Settings(BaseSettings):
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRATION_HOURS: int = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
     
+    def model_post_init(self, __context):
+        """初始化后验证，检查生产环境敏感设置"""
+        if self.MODE == "production":
+            # 生产环境安全检查
+            if self.JWT_SECRET_KEY == "change-this-secret-key-in-production":
+                import logging
+                logger = logging.getLogger(__name__)
+                logger.error(
+                    "🚨 严重安全错误：生产环境使用了默认的 JWT_SECRET_KEY。"
+                    "必须设置环境变量 JWT_SECRET_KEY 为强随机密钥。"
+                )
+                raise ValueError(
+                    "生产环境禁止使用默认 JWT_SECRET_KEY。"
+                    "请在环境变量中设置一个强随机密钥。"
+                )
+    
     # AWS Cognito（可选）
     AWS_COGNITO_USER_POOL_ID: str = os.getenv("AWS_COGNITO_USER_POOL_ID", "")
     AWS_COGNITO_CLIENT_ID: str = os.getenv("AWS_COGNITO_CLIENT_ID", "")
@@ -65,6 +81,24 @@ class Settings(BaseSettings):
     # 日志配置
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     CLOUDWATCH_LOG_GROUP: str = os.getenv("CLOUDWATCH_LOG_GROUP", "knowledgehub-logs")
+    
+    # 数据库配置
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite+aiosqlite:///./knowledgehub.db" if os.getenv("MODE", "development") == "development" 
+        else os.getenv("DATABASE_URL", "")
+    )
+    
+    # Redis 配置（可选，用于缓存）
+    REDIS_URL: str = os.getenv("REDIS_URL", "")
+    
+    @property
+    def DATABASE_URL_SYNC(self) -> str:
+        """同步数据库 URL（用于 Alembic 迁移）"""
+        url = self.DATABASE_URL
+        if url.startswith("sqlite+aiosqlite"):
+            return url.replace("sqlite+aiosqlite://", "sqlite://")
+        return url.replace("+aiosqlite", "").replace("+asyncpg", "")
     
     class Config:
         env_file = ".env"

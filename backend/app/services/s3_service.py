@@ -16,13 +16,24 @@ class S3Service:
     """AWS S3 服务"""
     
     def __init__(self):
-        self.s3_client = boto3.client(
-            's3',
-            region_name=settings.AWS_REGION,
-            aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
-            aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
-        )
+        self._s3_client = None
         self.bucket_name = settings.S3_BUCKET_NAME
+    
+    @property
+    def s3_client(self):
+        """懒加载 S3 客户端"""
+        if self._s3_client is None:
+            if not settings.AWS_ACCESS_KEY_ID or not settings.AWS_SECRET_ACCESS_KEY:
+                raise ValueError(
+                    "AWS 配置未设置。请在 .env 文件中配置 AWS_ACCESS_KEY_ID 和 AWS_SECRET_ACCESS_KEY"
+                )
+            self._s3_client = boto3.client(
+                's3',
+                region_name=settings.AWS_REGION,
+                aws_access_key_id=settings.AWS_ACCESS_KEY_ID,
+                aws_secret_access_key=settings.AWS_SECRET_ACCESS_KEY
+            )
+        return self._s3_client
     
     def upload_file(
         self,
@@ -62,37 +73,64 @@ class S3Service:
             logger.error(f"S3 上传失败: {e}")
             raise
     
-    def download_file(self, file_id: str) -> bytes:
+    def download_file(self, file_id: str, filename: str) -> bytes:
         """
         从 S3 下载文件
         
         Args:
             file_id: 文件ID
+            filename: 文件名（用于构建 S3 key）
             
         Returns:
             文件内容（字节）
         """
         try:
-            # 需要先获取文件列表或存储文件路径映射
-            # 这里简化处理
-            logger.info(f"下载文件: {file_id}")
-            # TODO: 实现完整的下载逻辑
-            return b""
+            s3_key = f"documents/{file_id}/{filename}"
+            
+            from io import BytesIO
+            file_obj = BytesIO()
+            
+            self.s3_client.download_fileobj(
+                self.bucket_name,
+                s3_key,
+                file_obj
+            )
+            
+            file_obj.seek(0)
+            file_content = file_obj.read()
+            
+            logger.info(f"文件下载成功: {s3_key}, 大小: {len(file_content)} 字节")
+            return file_content
         except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            if error_code == 'NoSuchKey':
+                logger.error(f"S3 文件不存在: {s3_key}")
+                raise ValueError(f"文件不存在: {filename}")
             logger.error(f"S3 下载失败: {e}")
             raise
     
-    def delete_file(self, file_id: str):
+    def delete_file(self, file_id: str, filename: str):
         """
         删除 S3 文件
         
         Args:
             file_id: 文件ID
+            filename: 文件名（用于构建 S3 key）
         """
         try:
-            logger.info(f"删除文件: {file_id}")
-            # TODO: 实现删除逻辑
+            s3_key = f"documents/{file_id}/{filename}"
+            
+            self.s3_client.delete_object(
+                Bucket=self.bucket_name,
+                Key=s3_key
+            )
+            
+            logger.info(f"文件删除成功: {s3_key}")
         except ClientError as e:
+            error_code = e.response.get('Error', {}).get('Code', '')
+            if error_code == 'NoSuchKey':
+                logger.warning(f"S3 文件不存在，跳过删除: {s3_key}")
+                return
             logger.error(f"S3 删除失败: {e}")
             raise
 

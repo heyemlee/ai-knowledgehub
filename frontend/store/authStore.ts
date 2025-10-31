@@ -16,6 +16,7 @@ interface AuthState {
   user: User | null
   token: string | null
   login: (email: string, password: string) => Promise<void>
+  register: (email: string, password: string, fullName?: string) => Promise<void>
   logout: () => void
   checkAuth: () => void
 }
@@ -38,6 +39,16 @@ export const useAuthStore = create<AuthState>((set) => ({
         user: userData,
         token: response.access_token,
       })
+    } catch (error) {
+      throw error
+    }
+  },
+
+  register: async (email: string, password: string, fullName?: string) => {
+    try {
+      await authAPI.register({ email, password, full_name: fullName })
+      // 注册成功后自动登录
+      await useAuthStore.getState().login(email, password)
     } catch (error) {
       throw error
     }
