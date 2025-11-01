@@ -1,0 +1,60 @@
+# Railway 部署忽略文件
+
+# 前端文件（后端部署不需要）
+frontend/
+node_modules/
+
+# 文档目录
+documents/
+
+# 本地数据库
+backend/knowledgehub.db
+backend/**/*.db
+
+# Python 缓存
+**/__pycache__/
+**/*.pyc
+**/*.pyo
+**/*.pyd
+.Python
+
+# 虚拟环境
+backend/venv/
+backend/env/
+backend/.venv/
+
+# 开发工具
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# 测试文件
+backend/test_*.py
+backend/**/test_*.py
+
+# 脚本（不需要在生产环境运行）
+scripts/
+
+# 本地环境文件
+.env.local
+.env.*.local
+
+# Git
+.git/
+.gitignore
+
+# 示例文件
+backend/examples/
+
+# 日志
+*.log
+
+# 临时文件
+*.tmp
+.DS_Store
+
+
+
+

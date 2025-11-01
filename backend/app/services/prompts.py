@@ -141,7 +141,6 @@ Return only keywords, no other explanation:"""
         keyword_hint = ""
         if core_keywords:
             keyword = core_keywords[0]
-            # 智能关键词映射：将问题中的关键词映射到文档中可能的关键词
             keyword_mapping = {
                 '产品': '公司产品',
                 '有什么产品': '公司产品',
@@ -162,7 +161,6 @@ Return only keywords, no other explanation:"""
                 '用什么做的': '橱柜材质'
             }
             
-            # 查找映射后的关键词
             mapped_keyword = keyword_mapping.get(keyword.lower(), keyword)
             
             if language == 'zh':
@@ -290,15 +288,12 @@ Now please answer in English:"""
         language: Literal['zh', 'en'] = 'zh'
     ) -> str:
         """获取流式问答的 prompt"""
-        # 计算文档片段数量（支持中英文格式）
         if language == 'zh':
             context_count = context_text.count("【文档片段")
         else:
             context_count = context_text.count("[Document Fragment")
         
-        # 如果都没找到，尝试另一种方式（通过换行符分隔）
         if context_count == 0:
-            # 估算：通过双换行符分隔的片段数量
             context_count = len([part for part in context_text.split("\n\n") if part.strip()])
         
         return Prompts.get_answer_generation_prompt(

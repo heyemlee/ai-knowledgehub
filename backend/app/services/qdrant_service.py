@@ -4,7 +4,7 @@ Qdrant 向量数据库服务
 from qdrant_client import QdrantClient
 from qdrant_client.models import Distance, VectorParams, PointStruct
 from app.core.config import settings
-from app.core.constants import QdrantConfig, CacheConfig
+from app.core.constants import QdrantConfig, CacheConfig, ProcessingConfig, SearchConfig
 from app.services.cache_service import cache_service
 from app.utils.retry import qdrant_retry, qdrant_operation_retry
 from typing import List, Dict, Optional
@@ -24,7 +24,6 @@ class QdrantService:
     
     @qdrant_retry
     def _create_client(self):
-        """创建 Qdrant 客户端（带重试）"""
         if not settings.QDRANT_URL or not settings.QDRANT_API_KEY:
             raise ValueError(
                 "Qdrant 配置未设置。请在 .env 文件中配置 QDRANT_URL 和 QDRANT_API_KEY"
@@ -35,32 +34,27 @@ class QdrantService:
         )
     
     def _reset_client(self):
-        """重置客户端连接（用于连接失败后重试）"""
         self._client = None
         self._initialized = False
     
     @property
     def client(self):
-        """懒加载 Qdrant 客户端"""
         if self._client is None:
             try:
                 self._client = self._create_client()
                 self._ensure_collection()
             except Exception as e:
                 logger.error(f"创建 Qdrant 客户端失败: {e}", exc_info=True)
-                # 重置客户端以便下次重试
                 self._reset_client()
                 raise
         return self._client
     
     @qdrant_operation_retry
     def _get_collections(self):
-        """获取集合列表（带重试）"""
         return self._client.get_collections().collections
     
     @qdrant_operation_retry
     def _create_collection(self, collection_name: str, vector_size: int):
-        """创建集合（带重试）"""
         self._client.create_collection(
             collection_name=collection_name,
             vectors_config=VectorParams(
@@ -71,11 +65,9 @@ class QdrantService:
     
     @qdrant_operation_retry
     def _get_collection_info(self, collection_name: str):
-        """获取集合信息（带重试）"""
         return self._client.get_collection(collection_name)
     
     def _ensure_collection(self):
-        """确保集合存在，不存在则创建"""
         if self._initialized:
             return
         
@@ -194,7 +186,7 @@ class QdrantService:
         query_text: str = None
     ) -> List[Dict]:
         """
-        向量相似度搜索（支持关键词优先，带缓存）
+        向量相似度搜索（优化版：智能缓存、去重、重排序）
         
         Args:
             query_embedding: 查询向量
@@ -205,12 +197,20 @@ class QdrantService:
         Returns:
             搜索结果列表，每个包含 content 和 metadata
         """
+        import time
+        import hashlib
+        start_time = time.time()
+        
         # 检查缓存是否启用
         if CacheConfig.ENABLE_CACHE:
-            # 生成缓存键（基于embedding和查询参数）
+            # 使用embedding的哈希值作为缓存键（更准确）
+            embedding_hash = hashlib.md5(
+                str(query_embedding).encode()
+            ).hexdigest()[:16]
+            
             cache_key = cache_service.cache_key(
                 CacheConfig.SEARCH_CACHE_PREFIX,
-                query_embedding=query_embedding[:100],  # 只使用前100维来生成key（避免key太长）
+                embedding_hash=embedding_hash,
                 limit=limit,
                 score_threshold=score_threshold,
                 query_text=query_text,
@@ -219,19 +219,34 @@ class QdrantService:
             
             cached_result = cache_service.get(cache_key)
             if cached_result is not None:
-                logger.debug(f"检索结果缓存命中: {cache_key[:50]}...")
+                logger.info(f"检索结果缓存命中 (耗时: {time.time() - start_time:.3f}s)")
                 return cached_result
         
-        # 执行搜索
         try:
-            from app.core.constants import SearchConfig
             search_limit = limit * SearchConfig.EXPANDED_SEARCH_MULTIPLIER if query_text else limit
             
             results = self._search_points(query_embedding, search_limit, score_threshold)
             
             documents = []
+            seen_contents = set()
+            seen_file_chunks = {}
+            
             for result in results:
-                content = result.payload.get("text", "")
+                content = result.payload.get("text", "").strip()
+                if not content:
+                    continue
+                
+                content_fingerprint = content[:100]
+                if content_fingerprint in seen_contents:
+                    continue
+                seen_contents.add(content_fingerprint)
+                
+                file_id = result.payload.get("file_id", "unknown")
+                chunk_count = seen_file_chunks.get(file_id, 0)
+                if chunk_count >= ProcessingConfig.MAX_CHUNKS_PER_FILE:
+                    continue
+                seen_file_chunks[file_id] = chunk_count + 1
+                
                 doc = {
                     "content": content,
                     "metadata": {
@@ -241,25 +256,57 @@ class QdrantService:
                 }
                 
                 if query_text:
-                    doc["has_keyword"] = query_text.lower() in content.lower()
+                    query_lower = query_text.lower()
+                    content_lower = content.lower()
+                    
+                    doc["has_exact_match"] = query_lower in content_lower
+                    
+                    keywords = query_lower.split()
+                    match_count = sum(1 for kw in keywords if kw in content_lower)
+                    doc["keyword_match_count"] = match_count
+                    doc["has_keyword"] = match_count > 0
                 
                 documents.append(doc)
             
             if query_text:
-                with_keyword = [d for d in documents if d.get("has_keyword", False)]
-                without_keyword = [d for d in documents if not d.get("has_keyword", False)]
+                def sort_key(doc):
+                    if doc.get("has_exact_match", False):
+                        return (3, doc["score"])
+                    elif doc.get("keyword_match_count", 0) > 1:
+                        return (2, doc["score"])
+                    elif doc.get("has_keyword", False):
+                        return (1, doc["score"])
+                    else:
+                        return (0, doc["score"])
                 
-                sorted_docs = sorted(with_keyword, key=lambda x: x["score"], reverse=True)
-                sorted_docs.extend(sorted(without_keyword, key=lambda x: x["score"], reverse=True))
+                documents = sorted(documents, key=sort_key, reverse=True)
                 
-                documents = sorted_docs[:limit]
-                logger.info(f"关键词匹配: 找到 {len(with_keyword)} 个包含关键词的文档，返回 {len(documents)} 个")
+                exact_match_count = sum(1 for d in documents if d.get("has_exact_match", False))
+                keyword_match_count = sum(1 for d in documents if d.get("has_keyword", False))
+                
+                logger.info(
+                    f"检索完成: 完全匹配={exact_match_count}, "
+                    f"关键词匹配={keyword_match_count}, "
+                    f"总文档={len(documents)}, "
+                    f"耗时={time.time() - start_time:.3f}s"
+                )
+            else:
+                documents = sorted(documents, key=lambda x: x["score"], reverse=True)
+                logger.info(
+                    f"检索完成: 返回{len(documents)}个文档, "
+                    f"耗时={time.time() - start_time:.3f}s"
+                )
             
-            # 缓存结果
+            documents = documents[:limit]
+            
             if CacheConfig.ENABLE_CACHE:
+                embedding_hash = hashlib.md5(
+                    str(query_embedding).encode()
+                ).hexdigest()[:16]
+                
                 cache_key = cache_service.cache_key(
                     CacheConfig.SEARCH_CACHE_PREFIX,
-                    query_embedding=query_embedding[:100],
+                    embedding_hash=embedding_hash,
                     limit=limit,
                     score_threshold=score_threshold,
                     query_text=query_text,

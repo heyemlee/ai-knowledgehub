@@ -57,11 +57,9 @@ class OpenAIService:
         if not settings.OPENAI_API_KEY:
             raise ValueError("OpenAI API Key 未配置。请在 .env 文件中设置 OPENAI_API_KEY")
         
-        # 检查缓存是否启用
         if not CacheConfig.ENABLE_CACHE:
             return self._generate_embeddings_without_cache(texts)
         
-        # 尝试从缓存获取
         cached_results = []
         uncached_texts = []
         uncached_indices = []
@@ -79,7 +77,6 @@ class OpenAIService:
                 uncached_texts.append(text)
                 uncached_indices.append(i)
         
-        # 如果有未缓存的文本，调用API生成
         new_embeddings = []
         new_token_usage = None
         if uncached_texts:
@@ -92,7 +89,6 @@ class OpenAIService:
                     actual_dim = len(new_embeddings[0])
                     logger.info(f"生成的向量维度: {actual_dim}")
                 
-                # 提取 token 使用量
                 if hasattr(response, 'usage') and response.usage:
                     new_token_usage = {
                         'prompt_tokens': response.usage.prompt_tokens,
@@ -100,7 +96,6 @@ class OpenAIService:
                         'total_tokens': response.usage.total_tokens
                     }
                 
-                # 缓存新生成的embeddings
                 for text, embedding in zip(uncached_texts, new_embeddings):
                     cache_key = cache_service.cache_key(
                         CacheConfig.EMBEDDING_CACHE_PREFIX,
@@ -114,7 +109,6 @@ class OpenAIService:
                     )
                 
                 logger.debug(f"缓存了 {len(new_embeddings)} 个新的embeddings，命中 {len(cached_results)} 个缓存")
-                
             except Exception as e:
                 error_msg = str(e)
                 if "api_key" in error_msg.lower() or "authentication" in error_msg.lower():
@@ -122,7 +116,6 @@ class OpenAIService:
                 logger.error(f"生成嵌入向量失败: {e}", exc_info=True)
                 raise
         
-        # 合并缓存和新的结果
         all_embeddings = [None] * len(texts)
         for i, embedding in cached_results:
             all_embeddings[i] = embedding
@@ -144,12 +137,11 @@ class OpenAIService:
                 actual_dim = len(embeddings[0])
                 logger.info(f"生成的向量维度: {actual_dim}")
             
-            # 提取 token 使用量
             token_usage = None
             if hasattr(response, 'usage') and response.usage:
                 token_usage = {
                     'prompt_tokens': response.usage.prompt_tokens,
-                    'completion_tokens': 0,  # embedding API 没有 completion tokens
+                    'completion_tokens': 0,
                     'total_tokens': response.usage.total_tokens
                 }
             
@@ -215,7 +207,6 @@ class OpenAIService:
             
             logger.info(f"AI提取的关键词: {keywords}")
             
-            # 提取 token 使用量
             token_usage = None
             if hasattr(response, 'usage') and response.usage:
                 token_usage = {
@@ -288,7 +279,6 @@ class OpenAIService:
         
         core_keywords, _ = self.extract_keywords(question, max_keywords=1)
         
-        # 根据语言获取相应的prompt
         system_prompt = Prompts.get_answer_generation_system(language=language)
         user_prompt = Prompts.get_answer_generation_prompt(
             question=question,
@@ -304,7 +294,6 @@ class OpenAIService:
         try:
             response = self._generate_answer_internal(system_prompt, user_prompt, temperature, max_tokens)
             
-            # 提取 token 使用量
             token_usage = None
             if hasattr(response, 'usage') and response.usage:
                 token_usage = {
@@ -359,11 +348,9 @@ class OpenAIService:
         Yields:
             (content, token_usage) 元组，其中 content 是文本片段，token_usage 是字典或 None
         """
-        # 检测语言以确定格式
         language = detect_language(question)
         logger.debug(f"检测到问题语言: {language}")
         
-        # 构建与非流式API相同格式的context_text
         context_parts = []
         for i, ctx in enumerate(context):
             score = ctx.get('score', 0.0)
@@ -382,10 +369,8 @@ class OpenAIService:
         
         context_text = "\n\n".join(context_parts)
         
-        # 提取关键词（用于hint）
         core_keywords, _ = self.extract_keywords(question, max_keywords=1)
         
-        # 根据语言获取相应的prompt
         system_prompt = Prompts.get_stream_answer_system(language=language)
         user_prompt = Prompts.get_stream_answer_prompt(
             question=question,
@@ -397,52 +382,40 @@ class OpenAIService:
         try:
             stream = self._stream_answer_internal(system_prompt, user_prompt, temperature, max_tokens)
             
-            # 流式响应需要累计 token 使用量
             prompt_tokens = 0
             completion_tokens = 0
             last_chunk = None
             full_answer_text = ""
-            
-            # 估算 prompt tokens（用作后备，如果无法从响应中获取）
-            # 中文约 1.5 字符/token，英文约 4 字符/token，取平均值约 3 字符/token
             estimated_prompt_tokens = len(system_prompt + user_prompt) // 3
             
             for chunk in stream:
                 last_chunk = chunk
                 
-                # 检查 chunk 是否有 choices 且不为空
                 if hasattr(chunk, 'choices') and chunk.choices and len(chunk.choices) > 0:
                     choice = chunk.choices[0]
                     
-                    # 检查是否有内容增量
                     if hasattr(choice, 'delta') and choice.delta and hasattr(choice.delta, 'content') and choice.delta.content:
                         content = choice.delta.content
                         full_answer_text += content
                         yield (content, None)
                     
-                    # 检查是否完成（finish_reason 不为 None）
                     if hasattr(choice, 'finish_reason') and choice.finish_reason is not None:
                         if hasattr(chunk, 'usage') and chunk.usage:
                             prompt_tokens = chunk.usage.prompt_tokens or estimated_prompt_tokens
                             completion_tokens = chunk.usage.completion_tokens or 0
                 
-                # 如果 chunk 直接包含 usage 信息（某些版本的 SDK）
                 if hasattr(chunk, 'usage') and chunk.usage:
                     prompt_tokens = chunk.usage.prompt_tokens or estimated_prompt_tokens
                     completion_tokens = chunk.usage.completion_tokens or 0
             
-            # 从最后一个 chunk 获取 token 使用量（如果可用）
             if last_chunk and hasattr(last_chunk, 'usage') and last_chunk.usage:
                 prompt_tokens = last_chunk.usage.prompt_tokens or estimated_prompt_tokens
                 completion_tokens = last_chunk.usage.completion_tokens or 0
             else:
-                # 如果没有 usage 信息，使用估算值作为后备
                 logger.warning("无法从流式响应获取 usage 信息，使用估算值")
                 prompt_tokens = estimated_prompt_tokens
-                # 估算 completion tokens（混合中英文）
                 completion_tokens = len(full_answer_text) // 3
             
-            # 在最后 yield token 使用量信息
             token_usage = {
                 'prompt_tokens': prompt_tokens,
                 'completion_tokens': completion_tokens,

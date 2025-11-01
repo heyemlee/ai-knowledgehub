@@ -2,27 +2,114 @@
 @tailwind components;
 @tailwind utilities;
 
-:root {
-  --foreground-rgb: 0, 0, 0;
-  --background-start-rgb: 214, 219, 220;
-  --background-end-rgb: 255, 255, 255;
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --foreground-rgb: 255, 255, 255;
-    --background-start-rgb: 0, 0, 0;
-    --background-end-rgb: 0, 0, 0;
+@layer base {
+  body {
+    @apply bg-white text-gray-900 antialiased;
   }
 }
 
-body {
-  color: rgb(var(--foreground-rgb));
-  background: linear-gradient(
-      to bottom,
-      transparent,
-      rgb(var(--background-end-rgb))
-    )
-    rgb(var(--background-start-rgb));
+/* 自定义滚动条 */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
 }
 
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+/* 消息动画 */
+@keyframes slideIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.message-slide-in {
+  animation: slideIn 0.2s ease-out;
+}
+
+/* 脉动加载动画（类似 ChatGPT） */
+@keyframes pulseScale {
+  0%, 100% {
+    transform: scale(1);
+    opacity: 1;
+  }
+  50% {
+    transform: scale(1.5);
+    opacity: 0.5;
+  }
+}
+
+.animate-pulse-scale {
+  animation: pulseScale 1.5s ease-in-out infinite;
+}
+
+/* 代码块样式 */
+pre {
+  @apply bg-gray-50 rounded-lg p-4 overflow-x-auto border border-gray-200;
+}
+
+code {
+  @apply text-gray-800 font-mono text-sm;
+}
+
+/* 链接样式 */
+a {
+  @apply text-gray-900 hover:text-gray-600 transition-colors underline-offset-4;
+}
+
+/* Markdown 渲染样式优化 */
+.prose {
+  @apply text-[15px] leading-relaxed;
+}
+
+.prose p {
+  @apply my-2;
+}
+
+.prose ul, .prose ol {
+  @apply my-2;
+}
+
+.prose li {
+  @apply my-1;
+}
+
+.prose strong {
+  @apply font-semibold;
+}
+
+.prose em {
+  @apply italic;
+}
+
+.prose h1, .prose h2, .prose h3, .prose h4, .prose h5, .prose h6 {
+  @apply font-bold mt-4 mb-2;
+}
+
+.prose code {
+  @apply bg-gray-100 px-1.5 py-0.5 rounded text-sm font-mono text-gray-800;
+}
+
+.prose pre {
+  @apply bg-gray-100 rounded-lg p-4 overflow-x-auto my-3 border border-gray-200;
+}
+
+.prose pre code {
+  @apply bg-transparent p-0;
+}

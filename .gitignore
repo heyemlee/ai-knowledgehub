@@ -59,6 +59,10 @@ temp/
 *.sqlite
 *.sqlite3
 
+# Local storage (uploaded files)
+storage/
+backend/storage/
+
 # Sensitive files
 *.key
 *.pem

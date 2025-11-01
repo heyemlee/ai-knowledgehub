@@ -81,3 +81,26 @@ async def get_current_user(
     payload = verify_token(token)
     return payload
 
+
+async def get_current_admin(
+    current_user: dict = Depends(get_current_user)
+) -> dict:
+    """
+    获取当前管理员用户（依赖注入）
+    
+    Args:
+        current_user: 当前用户信息
+        
+    Returns:
+        管理员用户信息
+        
+    Raises:
+        HTTPException: 用户不是管理员
+    """
+    if current_user.get("role") != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限"
+        )
+    return current_user
+

@@ -35,7 +35,7 @@ os.chdir(str(backend_dir))
 
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
-from app.services.s3_service import s3_service
+from app.services.local_storage_service import storage_service
 from app.utils.document_parser import DocumentParser
 from app.core.config import settings
 

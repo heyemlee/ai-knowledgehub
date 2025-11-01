@@ -1,6 +1,5 @@
 """
 问答 API 路由
-只提供流式 API，实时返回 AI 生成的回答
 """
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
@@ -33,27 +32,11 @@ async def stream_answer(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    流式问答接口（实时返回）
-    
-    使用 Server-Sent Events (SSE) 实时返回 AI 生成的回答片段。
-    返回格式：text/event-stream
-    
-    Args:
-        request: HTTP 请求对象（用于限流）
-        chat_request: 问答请求（包含问题、对话ID等）
-        current_user: 当前用户信息
-        db: 数据库会话
-        
-    Returns:
-        StreamingResponse: SSE 流式响应
-    """
+    """流式问答接口，使用 SSE 实时返回 AI 回答"""
     try:
         user_id = current_user.get("user_id")
         
-        # 检查 token 使用量限制
         if user_id:
-            # 估算本次请求的 token 数
             estimated_tokens = len(chat_request.question) // 4
             estimated_tokens += (chat_request.max_tokens or 1000)
             
@@ -96,7 +79,6 @@ async def stream_answer(
         question_embeddings, embedding_token_usage_stream = openai_service.generate_embeddings([chat_request.question])
         question_embedding = question_embeddings[0]
         
-        # 记录 embedding token 使用量
         if user_id and embedding_token_usage_stream:
             await token_usage_service.record_usage(
                 db=db,
@@ -111,7 +93,13 @@ async def stream_answer(
         relevant_docs = []
         try:
             question_length = len(chat_request.question.strip())
-            if question_length <= SearchConfig.SHORT_QUERY_THRESHOLD:
+            if question_length <= 10:
+                limit = 5
+                score_threshold = 0.6
+            elif question_length <= 50:
+                limit = 8
+                score_threshold = 0.55
+            elif question_length <= SearchConfig.SHORT_QUERY_THRESHOLD:
                 limit = SearchConfig.SHORT_QUERY_LIMIT
                 score_threshold = SearchConfig.SHORT_QUERY_THRESHOLD_SCORE
             else:
@@ -125,12 +113,23 @@ async def stream_answer(
                 query_text=chat_request.question
             )
             
+            if relevant_docs:
+                relevant_docs = openai_service.optimize_context_for_speed(
+                    documents=relevant_docs,
+                    max_tokens=2500
+            )
+            
             if not relevant_docs:
                 relevant_docs = qdrant_service.search(
                     query_embedding=question_embedding,
                     limit=SearchConfig.FALLBACK_LIMIT,
                     score_threshold=SearchConfig.FALLBACK_THRESHOLD_SCORE,
                     query_text=chat_request.question
+                )
+                if relevant_docs:
+                    relevant_docs = openai_service.optimize_context_for_speed(
+                        documents=relevant_docs,
+                        max_tokens=2500
                 )
         except Exception as e:
             logger.warning(f"向量检索失败: {e}")
@@ -162,10 +161,8 @@ async def stream_answer(
                         full_answer += chunk_content
                         yield f"data: {json.dumps({'content': chunk_content, 'done': False}, ensure_ascii=False)}\n\n"
                     elif chunk_token_usage is not None:
-                        # 这是最后一个chunk，包含token使用量信息
                         token_usage = chunk_token_usage
                 
-                # 如果没有获取到token_usage，使用估算值
                 if token_usage is None:
                     estimated_prompt = len(chat_request.question + str(relevant_docs)) // 3
                     estimated_completion = len(full_answer) // 3
@@ -182,13 +179,11 @@ async def stream_answer(
                 yield f"data: {json.dumps({'content': error_msg, 'done': True, 'error': True}, ensure_ascii=False)}\n\n"
                 return
             
-            # 去重处理：同一文件只保留一个来源，最多显示2个不同文件的来源
             seen_filenames = set()
             for doc in relevant_docs[:ProcessingConfig.MAX_CONTEXT_DOCS]:
                 metadata = doc.get("metadata", {})
                 filename = metadata.get("filename", "未知文档")
                 
-                # 如果这个文件名还没有出现过，且来源数量少于2个
                 if filename not in seen_filenames and len(sources) < 2:
                     seen_filenames.add(filename)
                     sources.append({
@@ -198,7 +193,6 @@ async def stream_answer(
             
             yield f"data: {json.dumps({'content': '', 'done': True, 'sources': sources, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
             
-            # 在流式响应完成后，记录 token 使用量和保存消息
             if user_id and conversation and full_answer:
                 try:
                     assistant_message = Message(
@@ -214,7 +208,6 @@ async def stream_answer(
                     
                     await db.commit()
                     
-                    # 记录 token 使用量
                     if token_usage:
                         await token_usage_service.record_usage(
                             db=db,

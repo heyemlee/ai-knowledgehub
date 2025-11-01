@@ -30,12 +30,6 @@ class Settings(BaseSettings):
     QDRANT_API_KEY: str = os.getenv("QDRANT_API_KEY", "")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "knowledge_base")
     
-    # AWS 配置
-    AWS_REGION: str = os.getenv("AWS_REGION", "us-east-1")
-    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
-    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
-    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "")
-    
     # JWT 配置
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-this-secret-key-in-production")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
@@ -57,10 +51,6 @@ class Settings(BaseSettings):
                     "请在环境变量中设置一个强随机密钥。"
                 )
     
-    # AWS Cognito（可选）
-    AWS_COGNITO_USER_POOL_ID: str = os.getenv("AWS_COGNITO_USER_POOL_ID", "")
-    AWS_COGNITO_CLIENT_ID: str = os.getenv("AWS_COGNITO_CLIENT_ID", "")
-    
     # CORS 配置
     FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
     
@@ -68,7 +58,13 @@ class Settings(BaseSettings):
     def CORS_ORIGINS(self) -> List[str]:
         """CORS 允许的来源"""
         if self.MODE == "development":
-            return ["http://localhost:3000", "http://127.0.0.1:3000"]
+            return [
+                "http://localhost:3000",
+                "http://127.0.0.1:3000",
+                "http://localhost:3001",
+                "http://localhost:3002",
+                "http://localhost:3003",
+            ]
         return [self.FRONTEND_URL]
     
     @property
@@ -91,6 +87,9 @@ class Settings(BaseSettings):
     
     # Redis 配置（可选，用于缓存）
     REDIS_URL: str = os.getenv("REDIS_URL", "")
+    
+    # 本地存储配置
+    LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", "./storage")
     
     @property
     def DATABASE_URL_SYNC(self) -> str:

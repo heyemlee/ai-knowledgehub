@@ -44,15 +44,9 @@ async def encrypt_api_key(
     """
     加密 API Key
     
-    仅管理员可用（生产环境应该添加管理员权限检查）
+    仅管理员可用（生产环境需要添加管理员权限检查）
     """
-    # TODO: 在生产环境中添加管理员权限检查
     if settings.MODE == "production":
-        # 检查用户是否为管理员
-        # user_id = current_user.get("user_id")
-        # user = await get_user_by_id(db, user_id)
-        # if not user or not user.is_admin:
-        #     raise HTTPException(status_code=403, detail="权限不足")
         pass
     
     try:
@@ -75,9 +69,8 @@ async def decrypt_api_key(
     """
     解密 API Key
     
-    仅管理员可用（生产环境应该添加管理员权限检查）
+    仅管理员可用（生产环境需要添加管理员权限检查）
     """
-    # TODO: 在生产环境中添加管理员权限检查
     if settings.MODE == "production":
         pass
     
@@ -101,14 +94,12 @@ async def rotate_api_key(
     """
     轮换 API Key
     
-    仅管理员可用（生产环境应该添加管理员权限检查）
+    仅管理员可用（生产环境需要添加管理员权限检查）
     """
-    # TODO: 在生产环境中添加管理员权限检查
     if settings.MODE == "production":
         pass
     
     try:
-        # 检查是否需要轮换
         should_rotate = api_key_rotation_service.should_rotate(
             request_data.key_name,
             max_age_days=90
@@ -117,7 +108,6 @@ async def rotate_api_key(
         if not should_rotate and request_data.old_encrypted_key:
             logger.warning(f"密钥 {request_data.key_name} 未达到轮换期限，但强制轮换")
         
-        # 执行轮换
         new_encrypted = api_key_rotation_service.rotate_key(
             key_name=request_data.key_name,
             old_encrypted_key=request_data.old_encrypted_key or "",
@@ -143,9 +133,8 @@ async def get_rotation_status(
     """
     获取密钥轮换状态
     
-    仅管理员可用（生产环境应该添加管理员权限检查）
+    仅管理员可用（生产环境需要添加管理员权限检查）
     """
-    # TODO: 在生产环境中添加管理员权限检查
     if settings.MODE == "production":
         pass
     
@@ -163,4 +152,7 @@ async def get_rotation_status(
     except Exception as e:
         logger.error(f"获取轮换状态失败: {e}")
         raise HTTPException(status_code=500, detail=f"获取状态失败: {str(e)}")
+
+
+
 

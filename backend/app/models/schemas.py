@@ -77,6 +77,7 @@ class UserResponse(BaseModel):
     email: str
     full_name: Optional[str] = None
     is_active: bool = True
+    role: str = "user"
     created_at: Optional[datetime] = None  # 允许为 None，简化开发
 
     class Config:
@@ -105,9 +106,8 @@ class ChatRequest(BaseModel):
             raise ValueError("问题不能为空")
         # 清理问题文本
         cleaned = InputSanitizer.sanitize_question(v)
-        # 检查SQL注入和XSS风险
-        if not InputSanitizer.validate_sql_injection_safe(cleaned):
-            raise ValueError("问题包含非法字符")
+        # 检查XSS风险（保留XSS检测，因为返回内容会在前端显示）
+        # 注：不检查SQL注入，因为系统使用ORM不会直接拼接SQL，且用户问题不用于SQL查询
         if not InputSanitizer.validate_xss_safe(cleaned):
             raise ValueError("问题包含非法字符")
         return cleaned
@@ -147,6 +147,7 @@ class DocumentMetadata(BaseModel):
     upload_time: datetime
     chunks_count: int
     status: str
+    user_id: Optional[int] = None  # 管理员可见
 
 
 class ConversationResponse(BaseModel):

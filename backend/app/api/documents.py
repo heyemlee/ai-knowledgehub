@@ -9,7 +9,7 @@ from app.models.schemas import DocumentUpload, DocumentMetadata
 from app.utils.auth import get_current_user
 from app.db.database import get_db
 from app.db.models import Document, User
-from app.services.s3_service import s3_service
+from app.services.local_storage_service import storage_service
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
 from app.services.token_usage_service import token_usage_service
@@ -38,12 +38,7 @@ async def upload_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    上传文档并处理
-    
-    支持格式：PDF, DOCX, XLSX, TXT
-    最大文件大小：50MB
-    """
+    """上传文档并处理（支持 PDF, DOCX, XLSX, TXT，最大 50MB）"""
     try:
         user_id = current_user.get("user_id")
         if not user_id:
@@ -51,7 +46,6 @@ async def upload_document(
         
         filename, file_extension = validate_file(file)
         
-        # 额外清理和验证文件名
         try:
             filename = InputSanitizer.sanitize_filename(filename)
         except ValueError as e:
@@ -64,7 +58,7 @@ async def upload_document(
         
         from io import BytesIO
         file_obj = BytesIO(file_content)
-        file_id = s3_service.upload_file(
+        file_id = storage_service.upload_file(
             file_obj=file_obj,
             filename=filename,
             content_type=file.content_type
@@ -91,7 +85,6 @@ async def upload_document(
         
         embeddings, embedding_token_usage = openai_service.generate_embeddings(chunks)
         
-        # 记录文档上传时的 embedding token 使用量
         if user_id and embedding_token_usage:
             await token_usage_service.record_usage(
                 db=db,
@@ -162,8 +155,6 @@ async def list_documents(
 ):
     """
     获取文档列表
-    
-    从数据库获取文档元数据，按上传时间倒序排列
     """
     try:
         user_id = current_user.get("user_id")
@@ -218,7 +209,6 @@ async def preview_document(
         if not user_id:
             raise HTTPException(status_code=401, detail="无法获取用户ID")
         
-        # 验证 file_id 格式（防止注入攻击）
         if not file_id or len(file_id) > 255:
             raise HTTPException(status_code=400, detail="无效的文件ID")
         
@@ -234,7 +224,7 @@ async def preview_document(
             raise HTTPException(status_code=404, detail="文档不存在")
         
         try:
-            file_content = s3_service.download_file(file_id, document.filename)
+            file_content = storage_service.download_file(file_id, document.filename)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         
@@ -295,7 +285,6 @@ async def download_document(
         if not user_id:
             raise HTTPException(status_code=401, detail="无法获取用户ID")
         
-        # 验证 file_id 格式（防止注入攻击）
         if not file_id or len(file_id) > 255:
             raise HTTPException(status_code=400, detail="无效的文件ID")
         
@@ -311,7 +300,7 @@ async def download_document(
             raise HTTPException(status_code=404, detail="文档不存在")
         
         try:
-            file_content = s3_service.download_file(file_id, document.filename)
+            file_content = storage_service.download_file(file_id, document.filename)
         except ValueError as e:
             raise HTTPException(status_code=404, detail=str(e))
         
@@ -353,7 +342,7 @@ async def delete_document(
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
         
-        s3_service.delete_file(file_id, document.filename)
+        storage_service.delete_file(file_id, document.filename)
         qdrant_service.delete_documents(file_id)
         
         db.delete(document)

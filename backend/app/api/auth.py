@@ -68,7 +68,7 @@ async def login(
     
     access_token_expires = timedelta(hours=settings.JWT_EXPIRATION_HOURS)
     access_token = create_access_token(
-        data={"sub": user.email, "user_id": user.id},
+        data={"sub": user.email, "user_id": user.id, "role": user.role},
         expires_delta=access_token_expires
     )
     
@@ -114,6 +114,7 @@ async def register(
         email=new_user.email,
         full_name=new_user.full_name,
         is_active=new_user.is_active,
+        role=new_user.role,
         created_at=new_user.created_at
     )
 
@@ -140,6 +141,7 @@ async def get_current_user_info(
         email=user.email,
         full_name=user.full_name,
         is_active=user.is_active,
+        role=user.role,
         created_at=user.created_at
     )
 

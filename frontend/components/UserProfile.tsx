@@ -1,9 +1,11 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+import { useRouter, usePathname } from 'next/navigation'
 import { tokenUsageAPI, TokenUsageStats } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
-import { X, User, TrendingUp, Calendar, RefreshCw, Loader2 } from 'lucide-react'
+import { useTranslations } from '@/lib/translations'
+import { X, User, TrendingUp, Calendar, RefreshCw, Loader2, Languages } from 'lucide-react'
 
 interface UserProfileProps {
   onClose: () => void
@@ -11,9 +13,46 @@ interface UserProfileProps {
 
 export default function UserProfile({ onClose }: UserProfileProps) {
   const { user } = useAuthStore()
+  const router = useRouter()
+  const pathname = usePathname()
+  const { t, locale: currentLocale } = useTranslations()
   const [stats, setStats] = useState<TokenUsageStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [showLanguageMenu, setShowLanguageMenu] = useState(false)
+
+  // 切换语言
+  const switchLanguage = (locale: 'zh-CN' | 'en-US') => {
+    if (locale === currentLocale) {
+      setShowLanguageMenu(false)
+      return
+    }
+    const segments = pathname.split('/')
+    // 移除当前的 locale，保留其余路径
+    const remainingPath = segments.slice(2).join('/')
+    const newPath = `/${locale}${remainingPath ? '/' + remainingPath : ''}`
+    setShowLanguageMenu(false)
+    router.push(newPath)
+    // 刷新页面以确保所有组件重新渲染
+    router.refresh()
+  }
+
+  // 点击外部关闭菜单
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      const target = event.target as HTMLElement
+      if (!target.closest('.language-switcher-container')) {
+        setShowLanguageMenu(false)
+      }
+    }
+
+    if (showLanguageMenu) {
+      document.addEventListener('mousedown', handleClickOutside)
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside)
+      }
+    }
+  }, [showLanguageMenu])
 
   const loadStats = async () => {
     try {
@@ -23,7 +62,7 @@ export default function UserProfile({ onClose }: UserProfileProps) {
       setStats(data)
     } catch (err: any) {
       console.error('加载使用量统计失败:', err)
-      setError(err.response?.data?.detail || '加载失败，请稍后重试')
+      setError(err.response?.data?.detail || t('profile.loadError'))
     } finally {
       setLoading(false)
     }
@@ -60,16 +99,46 @@ export default function UserProfile({ onClose }: UserProfileProps) {
           <div className="flex items-center gap-3">
             <User className="w-6 h-6 text-blue-600" />
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">个人中心</h2>
+              <h2 className="text-xl font-semibold text-gray-800">{t('profile.personalCenter')}</h2>
               <p className="text-sm text-gray-500">{user?.email}</p>
             </div>
           </div>
           <div className="flex items-center gap-2">
+            {/* Language Switcher */}
+            <div className="relative language-switcher-container">
+              <button
+                onClick={() => setShowLanguageMenu(!showLanguageMenu)}
+                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+                title={currentLocale === 'zh-CN' ? 'Language' : '语言'}
+              >
+                <Languages className="w-5 h-5" />
+              </button>
+              {showLanguageMenu && (
+                <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px] z-10">
+                  <button
+                    onClick={() => switchLanguage('en-US')}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
+                      currentLocale === 'en-US' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    English
+                  </button>
+                  <button
+                    onClick={() => switchLanguage('zh-CN')}
+                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
+                      currentLocale === 'zh-CN' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
+                    }`}
+                  >
+                    中文
+                  </button>
+                </div>
+              )}
+            </div>
             <button
               onClick={loadStats}
               disabled={loading}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="刷新"
+              title={t('common.refresh')}
             >
               {loading ? (
                 <Loader2 className="w-5 h-5 animate-spin" />
@@ -80,7 +149,7 @@ export default function UserProfile({ onClose }: UserProfileProps) {
             <button
               onClick={onClose}
               className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title="关闭"
+              title={t('common.close')}
             >
               <X size={20} />
             </button>
@@ -100,7 +169,7 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 onClick={loadStats}
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
-                重试
+                {t('common.retry')}
               </button>
             </div>
           ) : stats ? (
@@ -110,7 +179,7 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <Calendar className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-gray-800">今日使用量</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">{t('profile.dailyUsage')}</h3>
                   </div>
                   <span className="text-sm text-gray-600">
                     {formatNumber(stats.daily_usage)} / {formatNumber(stats.daily_limit)} tokens
@@ -119,8 +188,8 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 
                 <div className="mb-2">
                   <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>已使用: {formatNumber(stats.daily_usage)}</span>
-                    <span>剩余: {formatNumber(stats.daily_remaining)}</span>
+                    <span>{t('profile.used')}: {formatNumber(stats.daily_usage)}</span>
+                    <span>{t('profile.remaining')}: {formatNumber(stats.daily_remaining)}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div
@@ -131,7 +200,7 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 </div>
                 
                 <p className="text-xs text-gray-500 mt-2">
-                  使用率: {getPercentage(stats.daily_usage, stats.daily_limit).toFixed(1)}%
+                  {t('profile.usageRate')}: {getPercentage(stats.daily_usage, stats.daily_limit).toFixed(1)}%
                 </p>
               </div>
 
@@ -140,7 +209,7 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 <div className="flex items-center justify-between mb-4">
                   <div className="flex items-center gap-2">
                     <TrendingUp className="w-5 h-5 text-purple-600" />
-                    <h3 className="text-lg font-semibold text-gray-800">本月使用量</h3>
+                    <h3 className="text-lg font-semibold text-gray-800">{t('profile.monthlyUsage')}</h3>
                   </div>
                   <span className="text-sm text-gray-600">
                     {formatNumber(stats.monthly_usage)} / {formatNumber(stats.monthly_limit)} tokens
@@ -149,8 +218,8 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 
                 <div className="mb-2">
                   <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>已使用: {formatNumber(stats.monthly_usage)}</span>
-                    <span>剩余: {formatNumber(stats.monthly_remaining)}</span>
+                    <span>{t('profile.used')}: {formatNumber(stats.monthly_usage)}</span>
+                    <span>{t('profile.remaining')}: {formatNumber(stats.monthly_remaining)}</span>
                   </div>
                   <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
                     <div
@@ -161,18 +230,18 @@ export default function UserProfile({ onClose }: UserProfileProps) {
                 </div>
                 
                 <p className="text-xs text-gray-500 mt-2">
-                  使用率: {getPercentage(stats.monthly_usage, stats.monthly_limit).toFixed(1)}%
+                  {t('profile.usageRate')}: {getPercentage(stats.monthly_usage, stats.monthly_limit).toFixed(1)}%
                 </p>
               </div>
 
               {/* 使用说明 */}
               <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">使用说明</h4>
+                <h4 className="text-sm font-semibold text-gray-700 mb-2">{t('profile.instructions')}</h4>
                 <ul className="text-xs text-gray-600 space-y-1">
-                  <li>• 每日限制会在 00:00 UTC 重置</li>
-                  <li>• 每月限制会在每月 1 日重置</li>
-                  <li>• Token 使用量会根据您的问答请求实时更新</li>
-                  <li>• 达到限制后需要等待重置或联系管理员</li>
+                  <li>• {t('profile.instruction1')}</li>
+                  <li>• {t('profile.instruction2')}</li>
+                  <li>• {t('profile.instruction3')}</li>
+                  <li>• {t('profile.instruction4')}</li>
                 </ul>
               </div>
             </div>
@@ -182,5 +251,9 @@ export default function UserProfile({ onClose }: UserProfileProps) {
     </div>
   )
 }
+
+
+
+
 
 

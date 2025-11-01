@@ -1,14 +1,20 @@
 'use client'
 
 import { useState, useRef, useEffect } from 'react'
+import { useRouter } from 'next/navigation'
 import { chatAPI, ChatResponse, conversationsAPI, Message } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
+import { isAdmin } from '@/lib/auth'
+import { useTranslations } from '@/lib/translations'
 import ConversationHistory from './ConversationHistory'
-import DocumentPreview from './DocumentPreview'
 import UserProfile from './UserProfile'
-import { Send, LogOut, Eye, User } from 'lucide-react'
+import AdminPanel from './AdminPanel'
+import ReactMarkdown from 'react-markdown'
+import remarkGfm from 'remark-gfm'
+import { Send, LogOut, User, Settings } from 'lucide-react'
 
 export default function ChatInterface() {
+  const { t } = useTranslations()
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -17,10 +23,11 @@ export default function ChatInterface() {
   const [conversationId, setConversationId] = useState<string | null>(null)
   const [loadingMessages, setLoadingMessages] = useState(false)
   const [refreshHistory, setRefreshHistory] = useState(0)
-  const [previewDoc, setPreviewDoc] = useState<{ fileId: string; filename: string; fileType: string } | null>(null)
   const [showProfile, setShowProfile] = useState(false)
+  const [showAdmin, setShowAdmin] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { logout, user } = useAuthStore()
+  const router = useRouter()
 
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' })
@@ -53,7 +60,7 @@ export default function ChatInterface() {
       setConversationId(convId)
     } catch (error) {
       console.error('加载对话消息失败:', error)
-      alert('加载对话失败，请稍后重试')
+      alert(t('chat.loadingError'))
     } finally {
       setLoadingMessages(false)
     }
@@ -95,21 +102,21 @@ export default function ChatInterface() {
         if (chunk.content) {
           fullAnswer += chunk.content
           setStreamingContent(fullAnswer)
-          setTimeout(() => scrollToBottom(), 0)
         }
 
-        if (chunk.done) {
-          if (chunk.sources) {
-            finalSources = chunk.sources
+        if (chunk.sources) {
+          finalSources = chunk.sources
+        }
+
+        if (chunk.conversation_id) {
+          finalConversationId = chunk.conversation_id
+          if (!conversationId) {
+            setConversationId(chunk.conversation_id)
           }
-          if (chunk.conversation_id) {
-            finalConversationId = chunk.conversation_id
-          }
-          break
         }
       }
 
-      setConversationId(finalConversationId || conversationId)
+      setStreamingContent('')
       setMessages((prev) => [
         ...prev,
         {
@@ -118,14 +125,14 @@ export default function ChatInterface() {
           sources: finalSources,
         },
       ])
-      setStreamingContent('')
       setRefreshHistory((prev) => prev + 1)
     } catch (error: any) {
+      console.error('聊天错误:', error)
       setMessages((prev) => [
         ...prev,
         {
           role: 'assistant',
-          content: `错误: ${error.message || '请求失败，请稍后重试'}`,
+          content: `错误: ${error.message || t('chat.errorMessage')}`,
         },
       ])
       setStreamingContent('')
@@ -142,7 +149,7 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex h-screen bg-gray-50">
+    <div className="flex h-screen bg-white">
       {/* 对话历史侧边栏 */}
       <ConversationHistory
         currentConversationId={conversationId}
@@ -155,103 +162,98 @@ export default function ChatInterface() {
       <div className="flex-1 flex flex-col">
         {/* Header */}
         <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-800">ABC AI Knowledge Hub</h1>
-            <p className="text-sm text-gray-500">智能问答平台</p>
+          <div className="flex items-center gap-3">
+            <h1 className="text-2xl font-bold text-black">ABC AI Hub</h1>
           </div>
-          <div className="flex items-center gap-4">
+          <div className="flex items-center gap-2">
+            {isAdmin() && (
+              <button
+                onClick={() => setShowAdmin(true)}
+                className="flex items-center gap-2 px-4 py-2 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors"
+              >
+                <Settings size={16} />
+                <span className="hidden sm:inline">{t('chat.admin')}</span>
+              </button>
+            )}
             <button
               onClick={() => setShowProfile(true)}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              title="个人中心"
+              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
             >
               <User size={16} />
-              <span className="hidden sm:inline">{user?.email}</span>
+              <span className="hidden sm:inline text-xs">{user?.email}</span>
             </button>
             <button
               onClick={logout}
-              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-lg transition-colors"
-              title="退出登录"
+              className="flex items-center gap-2 px-4 py-2 text-sm text-gray-600 hover:bg-gray-50 rounded-lg transition-colors"
             >
               <LogOut size={16} />
-              <span className="hidden sm:inline">退出</span>
             </button>
           </div>
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-6 py-4 space-y-4">
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-8 space-y-6">
           {messages.length === 0 && (
-          <div className="text-center text-gray-500 mt-20">
-            <p className="text-lg mb-2">👋 欢迎使用知识库系统</p>
-            <p>请输入您的问题，AI 将基于企业知识库为您解答</p>
-          </div>
-          )}
-
-          {messages.map((msg, idx) => (
-          <div
-            key={idx}
-            className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'}`}
-          >
-            <div
-              className={`max-w-3xl rounded-lg px-4 py-3 ${
-                msg.role === 'user'
-                  ? 'bg-blue-600 text-white'
-                  : 'bg-white text-gray-800 shadow-sm border border-gray-200'
-              }`}
-            >
-              <p className="whitespace-pre-wrap">{msg.content}</p>
-              {msg.sources && msg.sources.length > 0 && (
-                <div className="mt-3 pt-3 border-t border-gray-200">
-                  <p className="text-xs font-semibold text-gray-500 mb-2">参考来源:</p>
-                  <div className="space-y-1">
-                    {msg.sources.map((source, i) => {
-                      const filename = source.metadata?.filename || '未知文档'
-                      const fileId = source.metadata?.file_id
-                      return (
-                        <div key={i} className="flex items-center justify-between text-xs text-gray-600 group">
-                          <span>
-                            • {filename}
-                          </span>
-                          {fileId && (
-                            <button
-                              onClick={() => setPreviewDoc({
-                                fileId,
-                                filename,
-                                fileType: source.metadata?.file_type || ''
-                              })}
-                              className="opacity-0 group-hover:opacity-100 ml-2 p-1 hover:bg-gray-100 rounded transition-opacity"
-                              title="预览文档"
-                            >
-                              <Eye size={14} />
-                            </button>
-                          )}
-                        </div>
-                      )
-                    })}
+            <div className="flex items-center justify-center h-full">
+              <div className="text-center max-w-2xl mx-auto">
+                <div className="mb-8">
+                  <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
+                    <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                    </svg>
                   </div>
                 </div>
-              )}
-            </div>
-          </div>
-          ))}
-
-          {streaming && streamingContent && (
-            <div className="flex justify-start">
-              <div className="max-w-3xl bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200">
-                <p className="whitespace-pre-wrap">{streamingContent}</p>
-                <span className="inline-block w-2 h-4 bg-blue-600 ml-1 animate-pulse"></span>
+                <h2 className="text-3xl font-bold mb-3 text-black">
+                  {t('chat.whatDoYouWant')}
+                </h2>
+                <p className="text-gray-500 text-base">
+                  {t('chat.assistantDescription')}
+                </p>
               </div>
             </div>
           )}
 
+          {messages.map((msg, idx) => (
+            <div
+              key={idx}
+              className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} message-slide-in`}
+            >
+              <div
+                className={`max-w-3xl rounded-2xl px-5 py-4 ${
+                  msg.role === 'user'
+                    ? 'bg-black text-white'
+                    : 'bg-gray-50 text-gray-900 border border-gray-100'
+                }`}
+              >
+                {msg.role === 'user' ? (
+                  <p className="whitespace-pre-wrap leading-relaxed text-[15px]">{msg.content}</p>
+                ) : (
+                  <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-li:text-gray-900">
+                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+
           {streaming && !streamingContent && (
-            <div className="flex justify-start">
-              <div className="bg-white rounded-lg px-4 py-3 shadow-sm border border-gray-200">
-                <div className="flex items-center gap-2">
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce"></div>
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.2s' }}></div>
-                  <div className="w-2 h-2 bg-blue-600 rounded-full animate-bounce" style={{ animationDelay: '0.4s' }}></div>
+            <div className="flex justify-start message-slide-in">
+              <div className="max-w-3xl rounded-2xl px-5 py-4 bg-gray-50 border border-gray-100 flex items-center justify-center min-h-[60px]">
+                <div className="w-3 h-3 bg-black rounded-full animate-pulse-scale"></div>
+              </div>
+            </div>
+          )}
+
+          {streaming && streamingContent && (
+            <div className="flex justify-start message-slide-in">
+              <div className="max-w-3xl rounded-2xl px-5 py-4 bg-gray-50 text-gray-900 border border-gray-100">
+                <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-li:text-gray-900">
+                  <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
+                </div>
+                <div className="flex items-center gap-2 mt-3">
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse"></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }}></div>
+                  <div className="w-2 h-2 bg-gray-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }}></div>
                 </div>
               </div>
             </div>
@@ -261,46 +263,44 @@ export default function ChatInterface() {
         </div>
 
         {/* Input */}
-        <div className="bg-white border-t border-gray-200 px-6 py-4">
-          <div className="flex items-end gap-4 max-w-4xl mx-auto">
-          <div className="flex-1">
-            <textarea
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              onKeyPress={handleKeyPress}
-              placeholder="输入您的问题..."
-              rows={1}
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
-              style={{ minHeight: '48px', maxHeight: '120px' }}
-            />
-          </div>
-          <button
-            onClick={handleSend}
-            disabled={!input.trim() || loading || streaming}
-            className="px-6 py-3 bg-blue-600 text-white rounded-lg hover:bg-blue-700 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:ring-offset-2 disabled:opacity-50 disabled:cursor-not-allowed transition-colors flex items-center gap-2"
-          >
-            <Send size={20} />
-            {streaming ? '生成中...' : '发送'}
-          </button>
+        <div className="border-t border-gray-200 bg-white p-4 md:p-6">
+          <div className="max-w-4xl mx-auto">
+            <div className="relative">
+              <textarea
+                value={input}
+                onChange={(e) => setInput(e.target.value)}
+                onKeyDown={handleKeyPress}
+                placeholder={t('chat.placeholder')}
+                disabled={streaming}
+                className="w-full px-5 py-4 pr-14 bg-white border border-gray-200 rounded-2xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400 resize-none"
+                rows={1}
+                style={{
+                  minHeight: '56px',
+                  maxHeight: '200px',
+                }}
+              />
+              <button
+                onClick={handleSend}
+                disabled={!input.trim() || streaming}
+                className="absolute right-3 bottom-3 p-3 bg-black hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl transition-all hover:scale-105 disabled:hover:scale-100"
+              >
+                {streaming ? (
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
+                ) : (
+                  <Send size={18} />
+                )}
+              </button>
+            </div>
+            <p className="text-xs text-gray-400 mt-3 text-center">
+              {t('chat.disclaimer')}
+            </p>
           </div>
         </div>
       </div>
 
-      {/* 文档预览弹窗 */}
-      {previewDoc && (
-        <DocumentPreview
-          fileId={previewDoc.fileId}
-          filename={previewDoc.filename}
-          fileType={previewDoc.fileType}
-          onClose={() => setPreviewDoc(null)}
-        />
-      )}
-
-      {/* 个人中心弹窗 */}
-      {showProfile && (
-        <UserProfile onClose={() => setShowProfile(false)} />
-      )}
+      {/* Modals */}
+      {showProfile && <UserProfile onClose={() => setShowProfile(false)} />}
+      {showAdmin && <AdminPanel isOpen={showAdmin} onClose={() => setShowAdmin(false)} />}
     </div>
   )
 }
-

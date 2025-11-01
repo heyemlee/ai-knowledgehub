@@ -16,9 +16,12 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制应用代码
 COPY . .
 
-# 暴露端口
+# 暴露端口（Railway 会动态分配）
 EXPOSE 8000
 
-# 启动命令
-CMD ["uvicorn", "app.main:app", "--host", "0.0.0.0", "--port", "8000"]
+# 设置环境变量默认值
+ENV PORT=8000
+
+# 启动命令（使用环境变量 PORT）
+CMD uvicorn app.main:app --host 0.0.0.0 --port $PORT
 

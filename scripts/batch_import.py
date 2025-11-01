@@ -35,7 +35,7 @@ os.chdir(str(backend_dir))
 
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
-from app.services.s3_service import s3_service
+from app.services.local_storage_service import storage_service
 from app.utils.document_parser import DocumentParser
 from app.core.config import settings
 
@@ -201,28 +201,6 @@ def import_to_qdrant(chunks: List[str], metadata_list: List[dict], file_path: Pa
         return 0
 
 
-def upload_to_s3(file_path: Path) -> str:
-    """
-    上传文件到 S3（可选）
-    
-    Args:
-        file_path: 文档路径
-        
-    Returns:
-        文件ID或空字符串
-    """
-    try:
-        with open(file_path, 'rb') as f:
-            file_id = s3_service.upload_file(
-                file_obj=f,
-                filename=file_path.name,
-                content_type=f"application/{file_path.suffix[1:]}"
-            )
-        logger.info(f"  ✓ 已上传到 S3 = {file_id}")
-        return file_id
-    except Exception as e:
-        logger.warning(f"S3 上传失败（可选）: {e}")
-        return ""
 
 
 def main():
@@ -309,12 +287,7 @@ def main():
             logger.error(f"导入失败: {e}")
             failed_files += 1
         
-        # 可选：上传到 S3
-        try:
-            if settings.S3_BUCKET_NAME:
-                upload_to_s3(file_path)
-        except Exception:
-            pass  # S3 上传失败不影响主流程
+        # 文件已在导入过程中自动处理，无需额外操作
     
     # 输出统计信息
     print("\n" + "=" * 60)
