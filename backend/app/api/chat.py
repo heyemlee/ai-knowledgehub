@@ -1,6 +1,3 @@
-"""
-问答 API 路由
-"""
 from fastapi import APIRouter, HTTPException, Depends, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -32,7 +29,6 @@ async def stream_answer(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """流式问答接口，使用 SSE 实时返回 AI 回答"""
     try:
         user_id = current_user.get("user_id")
         
@@ -142,7 +138,11 @@ async def stream_answer(
             nonlocal full_answer, token_usage
             
             if not relevant_docs:
-                error_msg = "抱歉，知识库中没有找到相关信息。请先上传相关文档到知识库。"
+                # 根据用户语言返回对应提示
+                if chat_request.locale == 'en-US':
+                    error_msg = "Sorry, no relevant information found in the knowledge base. Please upload relevant documents first."
+                else:
+                    error_msg = "抱歉，知识库中没有找到相关信息。请先上传相关文档到知识库。"
                 full_answer = error_msg
                 yield f"data: {json.dumps({'content': error_msg, 'done': True}, ensure_ascii=False)}\n\n"
                 return

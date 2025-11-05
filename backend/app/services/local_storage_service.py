@@ -9,8 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class LocalStorageService:
-    """本地文件存储服务"""
-
     def __init__(self):
         self.storage_dir = Path(settings.LOCAL_STORAGE_PATH)
         self.storage_dir.mkdir(parents=True, exist_ok=True)
@@ -143,11 +141,3 @@ class LocalStorageService:
 
 
 storage_service = LocalStorageService()
-
-
-
-
-
-
-
-

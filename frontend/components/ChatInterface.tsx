@@ -14,7 +14,7 @@ import remarkGfm from 'remark-gfm'
 import { Send, LogOut, User, Settings } from 'lucide-react'
 
 export default function ChatInterface() {
-  const { t } = useTranslations()
+  const { t, locale } = useTranslations()
   const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -94,6 +94,7 @@ export default function ChatInterface() {
         conversation_id: conversationId || undefined,
         temperature: 0.7,
         max_tokens: 1000,
+        locale: locale,  // 传递用户当前语言
       })) {
         if (chunk.error) {
           throw new Error(chunk.content)

@@ -1,7 +1,3 @@
-"""
-Token 使用量追踪服务
-记录和管理 OpenAI API token 使用量
-"""
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select, func, and_
 from app.db.models import TokenUsage, User
@@ -14,8 +10,6 @@ logger = logging.getLogger(__name__)
 
 
 class TokenUsageService:
-    """Token 使用量服务"""
-    
     @staticmethod
     async def record_usage(
         db: AsyncSession,
@@ -237,16 +231,4 @@ class TokenUsageService:
 
 
 token_usage_service = TokenUsageService()
-
-
-
-
-
-
-
-
-
-
-
-
 

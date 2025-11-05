@@ -1,8 +1,5 @@
-"""
-Qdrant 向量数据库服务
-"""
 from qdrant_client import QdrantClient
-from qdrant_client.models import Distance, VectorParams, PointStruct
+from qdrant_client.models import Distance, VectorParams, PointStruct, PayloadSchemaType
 from app.core.config import settings
 from app.core.constants import QdrantConfig, CacheConfig, ProcessingConfig, SearchConfig
 from app.services.cache_service import cache_service
@@ -15,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class QdrantService:
-    """Qdrant 向量数据库服务"""
-    
     def __init__(self):
         self._client = None
         self.collection_name = settings.QDRANT_COLLECTION_NAME
@@ -62,6 +57,39 @@ class QdrantService:
                 distance=Distance.COSINE
             )
         )
+        # 创建 payload 索引以支持过滤
+        self._create_payload_indexes(collection_name)
+    
+    @qdrant_operation_retry
+    def _create_payload_indexes(self, collection_name: str):
+        """为常用的过滤字段创建索引"""
+        try:
+            # 为 file_id 创建索引（keyword 类型）
+            self._client.create_payload_index(
+                collection_name=collection_name,
+                field_name="file_id",
+                field_schema=PayloadSchemaType.KEYWORD
+            )
+            logger.info(f"为 {collection_name} 的 file_id 字段创建索引")
+            
+            # 为 filename 创建索引（keyword 类型）
+            self._client.create_payload_index(
+                collection_name=collection_name,
+                field_name="filename",
+                field_schema=PayloadSchemaType.KEYWORD
+            )
+            logger.info(f"为 {collection_name} 的 filename 字段创建索引")
+            
+            # 为 source 创建索引（keyword 类型）
+            self._client.create_payload_index(
+                collection_name=collection_name,
+                field_name="source",
+                field_schema=PayloadSchemaType.KEYWORD
+            )
+            logger.info(f"为 {collection_name} 的 source 字段创建索引")
+            
+        except Exception as e:
+            logger.warning(f"创建 payload 索引时出错（可能索引已存在）: {e}")
     
     @qdrant_operation_retry
     def _get_collection_info(self, collection_name: str):
@@ -102,6 +130,9 @@ class QdrantService:
                 except Exception as parse_error:
                     logger.warning(f"无法解析集合信息（可能是版本兼容性问题）: {parse_error}")
                     logger.info("继续使用现有集合，但可能无法验证维度匹配")
+                
+                # 确保索引存在（即使集合已存在）
+                self._create_payload_indexes(self.collection_name)
             
             self._initialized = True
         except Exception as e:
@@ -460,14 +491,12 @@ class QdrantService:
 _qdrant_service_instance = None
 
 def get_qdrant_service() -> QdrantService:
-    """获取 Qdrant 服务实例（单例模式）"""
     global _qdrant_service_instance
     if _qdrant_service_instance is None:
         _qdrant_service_instance = QdrantService()
     return _qdrant_service_instance
 
 class QdrantServiceProxy:
-    """Qdrant 服务代理，延迟初始化"""
     def __getattr__(self, name):
         service = get_qdrant_service()
         return getattr(service, name)

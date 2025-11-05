@@ -1,6 +1,3 @@
-"""
-文档管理 API 路由
-"""
 from fastapi import APIRouter, HTTPException, Depends, UploadFile, File, Request
 from fastapi.responses import Response, StreamingResponse
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -38,7 +35,7 @@ async def upload_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """上传文档并处理（支持 PDF, DOCX, XLSX, TXT，最大 50MB）"""
+    """上传文档并处理（支持 PDF, DOCX, XLSX, TXT, MD，最大 50MB）"""
     try:
         user_id = current_user.get("user_id")
         if not user_id:
@@ -65,6 +62,8 @@ async def upload_document(
         )
         
         texts = []
+        chunk_metadata = []
+        
         if file_extension == '.pdf':
             texts = parser.parse_pdf(file_content)
         elif file_extension in ['.docx', '.doc']:
@@ -73,15 +72,27 @@ async def upload_document(
             texts = parser.parse_excel(file_content)
         elif file_extension == '.txt':
             texts = parser.parse_text(file_content)
+        elif file_extension == '.md':
+            # Markdown 使用结构化解析
+            sections = parser.parse_markdown(file_content)
+            from app.core.constants import DocumentParserConfig
+            chunks, chunk_metadata = parser.chunk_markdown(
+                sections,
+                chunk_size=DocumentParserConfig.DEFAULT_CHUNK_SIZE,
+                overlap=DocumentParserConfig.DEFAULT_OVERLAP
+            )
+            texts = None  # 标记已处理
         else:
             raise HTTPException(status_code=400, detail=f"不支持的文件格式: {file_extension}")
         
-        from app.core.constants import DocumentParserConfig
-        chunks = parser.chunk_text(
-            texts, 
-            chunk_size=DocumentParserConfig.DEFAULT_CHUNK_SIZE, 
-            overlap=DocumentParserConfig.DEFAULT_OVERLAP
-        )
+        # 对于非 Markdown 文件，使用通用切块
+        if texts is not None:
+            from app.core.constants import DocumentParserConfig
+            chunks = parser.chunk_text(
+                texts, 
+                chunk_size=DocumentParserConfig.DEFAULT_CHUNK_SIZE, 
+                overlap=DocumentParserConfig.DEFAULT_OVERLAP
+            )
         
         embeddings, embedding_token_usage = openai_service.generate_embeddings(chunks)
         
@@ -94,17 +105,29 @@ async def upload_document(
                 endpoint="documents/upload/embedding"
             )
         
-        metadata_list = [
-            {
+        # 构建元数据
+        metadata_list = []
+        for i in range(len(chunks)):
+            base_metadata = {
                 "file_id": file_id,
                 "filename": filename,
+                "source": filename,  # 添加 source 字段便于过滤
                 "file_type": file.content_type,
                 "file_size": file_size,
                 "chunk_index": i,
                 "upload_time": datetime.utcnow().isoformat()
             }
-            for i in range(len(chunks))
-        ]
+            
+            # 如果是 Markdown，添加结构化信息
+            if chunk_metadata and i < len(chunk_metadata):
+                base_metadata.update({
+                    "heading": chunk_metadata[i].get("heading", ""),
+                    "heading_level": chunk_metadata[i].get("level", 0),
+                    "section_path": chunk_metadata[i].get("section_path", ""),
+                    "section_chunk_index": chunk_metadata[i].get("section_chunk_index", 0)
+                })
+            
+            metadata_list.append(base_metadata)
         
         qdrant_service.add_documents(
             texts=chunks,
@@ -153,9 +176,6 @@ async def list_documents(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    获取文档列表
-    """
     try:
         user_id = current_user.get("user_id")
         
@@ -196,14 +216,6 @@ async def preview_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    预览文档
-    
-    支持的文件类型：
-    - PDF: 返回 PDF 文件的二进制流
-    - TXT: 返回文本内容
-    - 其他: 返回文件下载
-    """
     try:
         user_id = current_user.get("user_id")
         if not user_id:
@@ -239,7 +251,7 @@ async def preview_document(
                     'Cache-Control': 'public, max-age=3600'
                 }
             )
-        elif file_extension == 'txt':
+        elif file_extension in ['txt', 'md']:
             try:
                 text_content = file_content.decode('utf-8')
             except UnicodeDecodeError:
@@ -248,9 +260,10 @@ async def preview_document(
                 except:
                     text_content = file_content.decode('utf-8', errors='ignore')
             
+            media_type = 'text/markdown; charset=utf-8' if file_extension == 'md' else 'text/plain; charset=utf-8'
             return Response(
                 content=text_content,
-                media_type='text/plain; charset=utf-8',
+                media_type=media_type,
                 headers={
                     'Content-Disposition': f'inline; filename="{document.filename}"'
                 }
@@ -277,9 +290,6 @@ async def download_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    下载文档
-    """
     try:
         user_id = current_user.get("user_id")
         if not user_id:
@@ -325,9 +335,6 @@ async def delete_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
-    """
-    删除文档
-    """
     try:
         user_id = current_user.get("user_id")
         

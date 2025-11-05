@@ -1,7 +1,3 @@
-"""
-API 监控中间件
-记录请求统计、响应时间、错误率等
-"""
 from fastapi import Request, Response
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.types import ASGIApp
@@ -16,8 +12,6 @@ logger = logging.getLogger(__name__)
 
 
 class MonitoringMiddleware(BaseHTTPMiddleware):
-    """API 监控中间件"""
-    
     def __init__(self, app: ASGIApp):
         super().__init__(app)
         self.request_count = defaultdict(int)
@@ -191,24 +185,10 @@ _monitoring_instance: MonitoringMiddleware = None
 
 
 def get_monitoring_instance() -> MonitoringMiddleware:
-    """获取监控实例"""
     return _monitoring_instance
 
 
 def set_monitoring_instance(instance: MonitoringMiddleware):
-    """设置监控实例"""
     global _monitoring_instance
     _monitoring_instance = instance
-
-
-
-
-
-
-
-
-
-
-
-
 

@@ -1,7 +1,3 @@
-"""
-RAG（检索增强生成）服务
-整合 embedding、检索、生成的完整流程，提供统一接口和性能监控
-"""
 from typing import List, Dict, Optional, AsyncGenerator, Tuple
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
@@ -13,8 +9,6 @@ logger = logging.getLogger(__name__)
 
 
 class RAGService:
-    """RAG服务：完整的检索增强生成流程"""
-    
     def __init__(self):
         self.openai_service = openai_service
         self.qdrant_service = qdrant_service
@@ -25,17 +19,6 @@ class RAGService:
         limit: int = None,
         score_threshold: float = None
     ) -> Tuple[str, List[Dict], Dict]:
-        """
-        处理用户查询（非流式版本）
-        
-        Args:
-            question: 用户问题
-            limit: 返回结果数量
-            score_threshold: 相似度阈值
-            
-        Returns:
-            (answer, sources, metrics) 元组
-        """
         start_time = time.time()
         metrics = {
             'question_length': len(question),
@@ -135,20 +118,6 @@ class RAGService:
         limit: int = None,
         score_threshold: float = None
     ) -> AsyncGenerator[Tuple[Optional[str], Optional[List[Dict]], Optional[Dict]], None]:
-        """
-        流式处理用户查询
-        
-        Args:
-            question: 用户问题
-            limit: 返回结果数量
-            score_threshold: 相似度阈值
-            
-        Yields:
-            (content, sources, metrics) 元组
-            - content: 文本片段（生成过程中）或 None（完成时）
-            - sources: 文档来源（完成时）或 None
-            - metrics: 性能指标（完成时）或 None
-        """
         start_time = time.time()
         metrics = {
             'question_length': len(question),
@@ -251,17 +220,6 @@ class RAGService:
         limit: int = None,
         score_threshold: float = None
     ) -> Dict:
-        """
-        智能确定检索参数（基于问题长度和复杂度）
-        
-        Args:
-            question: 用户问题
-            limit: 指定的返回数量
-            score_threshold: 指定的相似度阈值
-            
-        Returns:
-            检索参数字典
-        """
         question_length = len(question.strip())
         
         # 短问题使用更宽松的检索策略
@@ -285,16 +243,6 @@ class RAGService:
         question_embedding: List[float],
         question: str
     ) -> List[Dict]:
-        """
-        降级检索策略（当主检索结果不足时）
-        
-        Args:
-            question_embedding: 问题向量
-            question: 问题文本
-            
-        Returns:
-            检索到的文档列表
-        """
         try:
             # 使用更宽松的阈值重新检索
             return self.qdrant_service.search(
@@ -308,15 +256,6 @@ class RAGService:
             return []
     
     def _extract_sources(self, documents: List[Dict]) -> List[Dict]:
-        """
-        从文档中提取来源信息
-        
-        Args:
-            documents: 文档列表
-            
-        Returns:
-            来源信息列表
-        """
         sources = []
         seen_files = set()
         
@@ -344,24 +283,12 @@ class RAGService:
         return sources[:ProcessingConfig.MAX_CONTEXT_DOCS]
 
 
-# 全局单例
 _rag_service_instance = None
 
 def get_rag_service() -> RAGService:
-    """获取 RAG 服务实例（单例模式）"""
     global _rag_service_instance
     if _rag_service_instance is None:
         _rag_service_instance = RAGService()
     return _rag_service_instance
 
-# 便捷访问
 rag_service = get_rag_service()
-
-
-
-
-
-
-
-
-

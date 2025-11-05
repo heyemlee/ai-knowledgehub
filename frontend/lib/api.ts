@@ -68,6 +68,7 @@ export interface ChatRequest {
   conversation_id?: string
   max_tokens?: number
   temperature?: number
+  locale?: string  // 用户语言
 }
 
 export interface ChatResponse {

@@ -37,6 +37,19 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
       fetchData()
     }
   }, [isOpen, activeTab])
+  
+  // 添加定时刷新（可选：每30秒自动刷新一次统计数据）
+  useEffect(() => {
+    if (!isOpen || activeTab !== 'dashboard') return
+    
+    const interval = setInterval(() => {
+      // 静默刷新统计数据
+      adminApi.getDocumentStats().then(setDocumentStats).catch(console.error)
+      adminApi.getUserStats().then(setUserStats).catch(console.error)
+    }, 30000) // 30秒
+    
+    return () => clearInterval(interval)
+  }, [isOpen, activeTab])
 
   const fetchData = async () => {
     setLoading(true)
@@ -71,7 +84,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
       return
     }
 
-    const allowedTypes = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt']
+    const allowedTypes = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md']
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!allowedTypes.includes(fileExt)) {
       alert(t('admin.unsupportedFileType', { types: allowedTypes.join(', ') }))
@@ -82,7 +95,25 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     try {
       await documentsAPI.upload(file)
       alert(t('admin.uploadSuccess'))
+      
+      // 刷新当前 tab 的数据
       fetchData()
+      
+      // 无论在哪个 tab，都同时刷新文档列表和统计数据
+      if (activeTab === 'dashboard') {
+        // 在 dashboard 时，额外刷新文档列表（以便切换到 documents tab 时能看到最新数据）
+        const docs = await adminApi.getAllDocuments()
+        setDocuments(docs)
+      } else {
+        // 在其他 tab 时，额外刷新统计数据
+        const [docs, usrs] = await Promise.all([
+          adminApi.getDocumentStats(),
+          adminApi.getUserStats(),
+        ])
+        setDocumentStats(docs)
+        setUserStats(usrs)
+      }
+      
       e.target.value = ''
     } catch (error: any) {
       console.error('上传失败:', error)
@@ -118,7 +149,24 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     try {
       await adminApi.deleteDocument(fileId)
       alert(t('admin.deleteSuccess'))
+      
+      // 刷新当前 tab 的数据
       fetchData()
+      
+      // 无论在哪个 tab，都同时刷新文档列表和统计数据
+      if (activeTab === 'dashboard') {
+        // 在 dashboard 时，额外刷新文档列表
+        const docs = await adminApi.getAllDocuments()
+        setDocuments(docs)
+      } else {
+        // 在其他 tab 时，额外刷新统计数据
+        const [docs, usrs] = await Promise.all([
+          adminApi.getDocumentStats(),
+          adminApi.getUserStats(),
+        ])
+        setDocumentStats(docs)
+        setUserStats(usrs)
+      }
     } catch (error) {
       console.error('删除失败:', error)
       alert(t('admin.deleteFailed'))
@@ -208,7 +256,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                     />
                     <StatCard
                       title={t('admin.storageUsage')}
-                      value={`${documentStats?.total_size_mb.toFixed(1) || 0} MB`}
+                      value={`${documentStats?.total_size_mb?.toFixed(1) || 0} MB`}
                     />
                     <StatCard
                       title={t('admin.activeUsers')}
@@ -235,7 +283,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                         type="file"
                         id="admin-file-upload"
                         className="hidden"
-                        accept=".pdf,.docx,.doc,.xlsx,.xls,.txt"
+                        accept=".pdf,.docx,.doc,.xlsx,.xls,.txt,.md"
                         onChange={handleFileUpload}
                         disabled={uploading}
                       />
@@ -286,7 +334,12 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                                 {doc.filename}
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-500">
-                                {(doc.file_size / 1024 / 1024).toFixed(2)} MB
+                                {doc.file_size > 0 
+                                  ? doc.file_size >= 1024 * 1024 
+                                    ? `${(doc.file_size / 1024 / 1024).toFixed(2)} MB`
+                                    : `${(doc.file_size / 1024).toFixed(2)} KB`
+                                  : '0 KB'
+                                }
                               </td>
                               <td className="px-4 py-3 text-sm text-gray-500">
                                 {doc.chunks_count}

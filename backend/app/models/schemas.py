@@ -97,6 +97,7 @@ class ChatRequest(BaseModel):
     conversation_id: Optional[str] = Field(None, max_length=100)
     max_tokens: Optional[int] = Field(1000, ge=1, le=100000)
     temperature: Optional[float] = Field(0.7, ge=0.0, le=2.0)
+    locale: Optional[str] = Field('zh-CN', max_length=10)  # 用户语言（zh-CN 或 en-US）
     
     @field_validator('question')
     @classmethod

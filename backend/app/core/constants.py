@@ -1,11 +1,5 @@
-"""
-应用常量配置
-统一管理所有硬编码的配置值
-"""
-
-
 class SearchConfig:
-    """检索相关配置"""
+
     # 短查询判断阈值（字符数）
     SHORT_QUERY_THRESHOLD = 6
     
@@ -35,7 +29,6 @@ class SearchConfig:
 
 
 class DocumentParserConfig:
-    """文档解析配置"""
     # 文本切分默认配置
     DEFAULT_CHUNK_SIZE = 1000
     DEFAULT_OVERLAP = 200
@@ -52,7 +45,6 @@ class DocumentParserConfig:
 
 
 class AIConfig:
-    """AI 相关配置"""
     # 关键词提取配置
     KEYWORD_EXTRACTION_TEMPERATURE = 0.3
     KEYWORD_EXTRACTION_MAX_TOKENS = 50
@@ -64,7 +56,6 @@ class AIConfig:
 
 
 class QdrantConfig:
-    """Qdrant 相关配置"""
     # 默认检索配置
     DEFAULT_SEARCH_LIMIT = 5
     DEFAULT_SCORE_THRESHOLD = 0.6
@@ -74,14 +65,12 @@ class QdrantConfig:
 
 
 class ProcessingConfig:
-    """处理相关配置"""
     # 文档去重配置
     MAX_CHUNKS_PER_FILE = 5
     MAX_CONTEXT_DOCS = 5  # 保留不包含关键词的文档数量
 
 
 class RateLimitConfig:
-    """API 限流配置"""
     # 全局限流（每分钟请求数）
     GLOBAL_RATE_LIMIT = "100/minute"
     
@@ -102,7 +91,6 @@ class RateLimitConfig:
 
 
 class TokenLimitConfig:
-    """OpenAI Token 使用量限制配置"""
     # 每个用户每日 token 限制（问答相关）
     DAILY_TOKEN_LIMIT_PER_USER = 100000  # 100K tokens/天
     
@@ -117,9 +105,8 @@ class TokenLimitConfig:
 
 
 class FileValidationConfig:
-    """文件验证配置"""
     # 允许的文件扩展名
-    ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt'}
+    ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md'}
     
     # 允许的 MIME 类型
     ALLOWED_MIME_TYPES = {
@@ -129,6 +116,7 @@ class FileValidationConfig:
         'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         'application/vnd.ms-excel',
         'text/plain',
+        'text/markdown',
     }
     
     # 文件大小限制（字节）
@@ -142,11 +130,11 @@ class FileValidationConfig:
         '.xlsx': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
         '.xls': 'application/vnd.ms-excel',
         '.txt': 'text/plain',
+        '.md': 'text/markdown',
     }
 
 
 class RetryConfig:
-    """重试机制配置"""
     # OpenAI API 重试配置
     OPENAI_MAX_ATTEMPTS = 3  # 最大重试次数
     OPENAI_MIN_WAIT = 2  # 最小等待时间（秒）
@@ -164,21 +152,15 @@ class RetryConfig:
 
 
 class CacheConfig:
-    """缓存配置"""
     # Embedding 缓存时间（秒）- 24小时，因为相同文本的embedding通常不变
     EMBEDDING_CACHE_TTL = 86400
     
-    # 向量检索结果缓存时间（秒）- 1小时，因为知识库可能更新
     SEARCH_RESULT_CACHE_TTL = 3600
     
-    # 完整回答缓存时间（秒）- 30分钟，因为上下文可能变化
     ANSWER_CACHE_TTL = 1800
     
-    # 缓存是否启用（可通过环境变量控制）
     ENABLE_CACHE = True
     
-    # 缓存键前缀
     EMBEDDING_CACHE_PREFIX = "embedding"
     SEARCH_CACHE_PREFIX = "search"
     ANSWER_CACHE_PREFIX = "answer"
-
