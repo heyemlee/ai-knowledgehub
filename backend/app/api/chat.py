@@ -9,6 +9,7 @@ from app.db.models import Conversation, Message
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
 from app.services.token_usage_service import token_usage_service
+from app.services.cleanup_service import cleanup_old_conversations_for_user
 from app.middleware.rate_limit import limiter
 from app.core.constants import RateLimitConfig, TokenLimitConfig, SearchConfig, ProcessingConfig
 from app.core.config import settings
@@ -207,6 +208,12 @@ async def stream_answer(
                         conversation.title = chat_request.question[:50]
                     
                     await db.commit()
+                    
+                    # 清理用户超过最大数量的旧对话（只保留最近10个）
+                    # 在保存完消息后清理，确保新对话已经保存
+                    if user_id:
+                        await cleanup_old_conversations_for_user(db, user_id)
+                        await db.commit()
                     
                     if token_usage:
                         await token_usage_service.record_usage(

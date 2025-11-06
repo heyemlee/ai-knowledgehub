@@ -4,6 +4,8 @@ import { useState, useEffect } from 'react'
 import { conversationsAPI, Conversation } from '@/lib/api'
 import { useTranslations } from '@/lib/translations'
 import { MessageSquare, Trash2, Loader2, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
+import { toast } from './Toast'
+import { confirm } from './ConfirmDialog'
 
 interface ConversationHistoryProps {
   currentConversationId: string | null
@@ -86,7 +88,13 @@ export default function ConversationHistory({
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation()
-    if (!confirm(t('conversation.deleteConfirm'))) return
+    const confirmed = await confirm(t('conversation.deleteConfirm'), {
+      title: t('common.delete'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+    })
+    
+    if (!confirmed) return
 
     try {
       setDeletingId(conversationId)
@@ -95,9 +103,10 @@ export default function ConversationHistory({
       if (currentConversationId === conversationId) {
         onNewConversation()
       }
+      toast.success(t('conversation.deleteSuccess'))
     } catch (error) {
       console.error('删除对话失败:', error)
-      alert(t('conversation.deleteFailed'))
+      toast.error(t('conversation.deleteFailed'))
     } finally {
       setDeletingId(null)
     }

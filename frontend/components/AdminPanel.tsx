@@ -5,6 +5,8 @@ import { adminApi, AdminDocument, AdminUser, DocumentStats, UserStats } from '@/
 import { documentsAPI } from '@/lib/api'
 import { useTranslations } from '@/lib/translations'
 import { X, Upload, Trash2, Users, FileText, Download } from 'lucide-react'
+import { toast } from './Toast'
+import { confirm } from './ConfirmDialog'
 
 interface AdminPanelProps {
   isOpen: boolean
@@ -80,21 +82,21 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     if (!file) return
 
     if (file.size > 50 * 1024 * 1024) {
-      alert(t('admin.fileTooLarge'))
+      toast.error(t('admin.fileTooLarge'))
       return
     }
 
     const allowedTypes = ['.pdf', '.docx', '.doc', '.xlsx', '.xls', '.txt', '.md']
     const fileExt = '.' + file.name.split('.').pop()?.toLowerCase()
     if (!allowedTypes.includes(fileExt)) {
-      alert(t('admin.unsupportedFileType', { types: allowedTypes.join(', ') }))
+      toast.error(t('admin.unsupportedFileType', { types: allowedTypes.join(', ') }))
       return
     }
 
     setUploading(true)
     try {
       await documentsAPI.upload(file)
-      alert(t('admin.uploadSuccess'))
+      toast.success(t('admin.uploadSuccess'))
       
       // 刷新当前 tab 的数据
       fetchData()
@@ -117,7 +119,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
       e.target.value = ''
     } catch (error: any) {
       console.error('上传失败:', error)
-      alert(t('admin.uploadFailed', { error: error.response?.data?.detail || error.message }))
+      toast.error(t('admin.uploadFailed', { error: error.response?.data?.detail || error.message }))
     } finally {
       setUploading(false)
     }
@@ -137,18 +139,24 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
       document.body.removeChild(a)
     } catch (error) {
       console.error('下载失败:', error)
-      alert(t('admin.downloadFailed'))
+      toast.error(t('admin.downloadFailed'))
     }
   }
 
   const handleDelete = async (fileId: string, filename: string) => {
-    if (!confirm(t('admin.deleteConfirm', { filename }))) {
+    const confirmed = await confirm(t('admin.deleteConfirm', { filename }), {
+      title: t('admin.delete'),
+      confirmText: t('common.delete'),
+      cancelText: t('common.cancel'),
+    })
+    
+    if (!confirmed) {
       return
     }
 
     try {
       await adminApi.deleteDocument(fileId)
-      alert(t('admin.deleteSuccess'))
+      toast.success(t('admin.deleteSuccess'))
       
       // 刷新当前 tab 的数据
       fetchData()
@@ -169,7 +177,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
       }
     } catch (error) {
       console.error('删除失败:', error)
-      alert(t('admin.deleteFailed'))
+      toast.error(t('admin.deleteFailed'))
     }
   }
 

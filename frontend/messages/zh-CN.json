@@ -106,6 +106,7 @@
     "newConversation": "新建对话",
     "noConversations": "暂无对话记录",
     "deleteConfirm": "确定要删除这个对话吗？",
+    "deleteSuccess": "删除成功",
     "deleteFailed": "删除对话失败，请稍后重试",
     "expandSidebar": "展开侧边栏",
     "collapseSidebar": "折叠侧边栏"

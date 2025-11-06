@@ -2,6 +2,7 @@
  * 管理员 API
  */
 import axios from 'axios'
+import { toast } from '@/components/Toast'
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 
@@ -32,7 +33,7 @@ adminClient.interceptors.response.use(
       localStorage.removeItem('access_token')
       window.location.href = '/'
     } else if (error.response?.status === 403) {
-      alert('需要管理员权限')
+      toast.error('需要管理员权限')
       window.location.href = '/'
     }
     return Promise.reject(error)

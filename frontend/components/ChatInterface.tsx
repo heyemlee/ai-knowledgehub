@@ -12,6 +12,7 @@ import AdminPanel from './AdminPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Send, LogOut, User, Settings } from 'lucide-react'
+import { toast } from './Toast'
 
 export default function ChatInterface() {
   const { t, locale } = useTranslations()
@@ -60,7 +61,7 @@ export default function ChatInterface() {
       setConversationId(convId)
     } catch (error) {
       console.error('加载对话消息失败:', error)
-      alert(t('chat.loadingError'))
+      toast.error(t('chat.loadingError'))
     } finally {
       setLoadingMessages(false)
     }
