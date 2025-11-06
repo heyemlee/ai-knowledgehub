@@ -32,14 +32,15 @@ cd abc-ai-knowledgehub
 #### 2. 配置环境变量
 
 ```bash
-# 复制环境变量模板
-cp railway.env.example .env
+# 创建 .env 文件
+touch .env
 
 # 编辑 .env 文件，填入必需的配置
 # - OPENAI_API_KEY: OpenAI API 密钥
 # - QDRANT_URL: Qdrant Cloud URL
 # - QDRANT_API_KEY: Qdrant API Key
 # - JWT_SECRET_KEY: 使用 python scripts/generate_jwt_secret.py 生成
+# - DATABASE_URL: 数据库连接字符串（开发环境使用 SQLite，生产环境使用 PostgreSQL）
 ```
 
 #### 3. 启动后端
@@ -95,9 +96,10 @@ npm run dev
 
 ### 存储
 
-- **本地文件存储** - 文档持久化（支持 Railway Volumes）
+- **本地文件存储** - 文档持久化（开发环境）
+- **S3/EFS** - AWS 生产环境文件存储
 - **SQLite** - 开发环境数据库
-- **PostgreSQL** - 生产环境数据库（Railway 自动配置）
+- **PostgreSQL** - 生产环境数据库（AWS RDS）
 
 ## 📁 项目结构
 
@@ -139,20 +141,21 @@ abc-ai-knowledgehub/
 1. **注册/登录** - 开发环境支持用户注册，生产环境需管理员邀请
 2. **智能问答** - 输入问题，AI 基于知识库回答，查看相关文档来源
 
-## 🚢 部署到 Railway
+## 🚢 部署到 AWS
 
-### 一键部署
+详细的 AWS 部署指南请参考 [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md)
 
-[![Deploy on Railway](https://railway.app/button.svg)](https://railway.app)
+### 快速部署步骤
 
-### 手动部署步骤
+1. **准备 AWS 资源** - VPC、RDS PostgreSQL、S3、ECS 集群等
+2. **配置 Secrets Manager** - 存储敏感配置信息
+3. **构建和推送 Docker 镜像** - 推送到 ECR
+4. **创建 ECS 服务** - 配置任务定义和服务
+5. **配置应用负载均衡器** - 设置 ALB 和目标组
+6. **部署前端** - 使用 Vercel 或 AWS Amplify
+7. **初始化数据库** - 运行数据库初始化脚本
 
-1. **创建 Railway 项目** - 注册账号并连接 GitHub 仓库
-2. **添加 PostgreSQL 服务** - Railway 会自动配置 `DATABASE_URL`
-3. **配置环境变量** - 设置 `MODE`, `OPENAI_API_KEY`, `QDRANT_URL`, `QDRANT_API_KEY`, `JWT_SECRET_KEY`
-4. **配置 Volume** - 挂载路径 `/app/backend/storage`，大小 5GB+
-5. **初始化数据库** - 在 Railway Shell 中运行 `cd backend && python scripts/init_db.py`
-6. **部署前端** - 推荐使用 Vercel，配置环境变量 `NEXT_PUBLIC_API_URL`
+更多详细信息请查看 [AWS 部署文档](./AWS_DEPLOYMENT.md)
 
 ## 🛠️ 常用脚本
 
@@ -181,6 +184,7 @@ python scripts/reset_qdrant_collection.py
 ## 📚 详细文档
 
 - [架构文档](./ARCHITECTURE.md) - 详细的技术架构说明
+- [AWS 部署指南](./AWS_DEPLOYMENT.md) - 完整的 AWS 部署流程
 - [待办事项](./TODO.md) - 功能清单和开发计划
 
 ## 📝 License

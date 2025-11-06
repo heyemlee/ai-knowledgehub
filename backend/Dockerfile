@@ -16,7 +16,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 # 复制应用代码
 COPY . .
 
-# 暴露端口（Railway 会动态分配）
+# 暴露端口
 EXPOSE 8000
 
 # 设置环境变量默认值

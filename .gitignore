@@ -86,3 +86,4 @@ documents/*.ppt
 !documents/.gitkeep
 
 Todo.md
+AWS_DEPLOYMENT.md

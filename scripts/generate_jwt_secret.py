@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """
 生成强随机 JWT 密钥
-用于 Railway 部署或本地开发
+用于 AWS 部署或本地开发
 """
 import secrets
 import sys
@@ -39,9 +39,9 @@ def main():
     print("=" * 60)
     print()
     print("1. 复制上面的密钥")
-    print("2. 在 Railway 项目的 Variables 中添加:")
-    print("   - 变量名: JWT_SECRET_KEY")
-    print("   - 变量值: (粘贴上面生成的密钥)")
+    print("2. AWS 部署时，添加到 Secrets Manager:")
+    print("   - Secret 名称: knowledgehub/jwt-secret")
+    print("   - Secret 值: (粘贴上面生成的密钥)")
     print()
     print("3. 本地开发时，添加到 .env 文件:")
     print(f"   JWT_SECRET_KEY={secret}")
@@ -63,6 +63,7 @@ if __name__ == "__main__":
     except Exception as e:
         print(f"\n\n❌ 错误: {e}", file=sys.stderr)
         sys.exit(1)
+
 
 
 

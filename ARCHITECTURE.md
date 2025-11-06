@@ -79,7 +79,8 @@
 **存储**
 - PostgreSQL (生产环境) / SQLite (开发环境)
 - Qdrant Cloud - 向量数据库
-- 本地文件系统 - 文档存储（支持 Railway Volumes）
+- 本地文件系统 - 文档存储（开发环境）
+- S3/EFS - AWS 生产环境文件存储
 
 ---
 
@@ -428,7 +429,7 @@ backend/
 **特性：**
 - UUID 文件 ID（避免文件名冲突）
 - 自动创建存储目录
-- Railway Volumes 支持
+- AWS S3/EFS 支持（生产环境）
 
 #### Token 统计服务 (`services/token_usage_service.py`)
 
@@ -885,51 +886,81 @@ JWT 认证
 
 ## 部署架构
 
-### Railway 部署
+### AWS 部署
 
+详细的 AWS 部署架构和步骤请参考 [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md)
+
+**架构概览：**
 ```
 GitHub Repository
-  ↓ (自动部署)
-Railway Platform
-  ├── Backend Service
-  │   ├── FastAPI 应用
-  │   ├── Dockerfile 构建
-  │   ├── Volume 挂载 (/app/backend/storage)
-  │   └── 健康检查 (/health)
-  ├── PostgreSQL Service
-  │   └── 自动配置 DATABASE_URL
-  └── Redis Service (可选)
-      └── 自动配置 REDIS_URL
+  ↓ (CI/CD)
+AWS ECR (Docker 镜像)
   ↓
-Vercel (前端部署)
+ECS Fargate (后端容器)
+  ├── FastAPI 应用
+  ├── 健康检查 (/health)
+  └── CloudWatch 日志
+  ↓
+Application Load Balancer (ALB)
+  ├── HTTPS (443)
+  └── HTTP (80) → HTTPS 重定向
+  ↓
+Route 53 DNS
+  └── api.yourdomain.com
+
+AWS RDS PostgreSQL
+  └── 生产数据库
+
+AWS S3 / EFS
+  └── 文件存储
+
+AWS ElastiCache Redis (可选)
+  └── 缓存服务
+
+前端部署 (Vercel / AWS Amplify)
   └── Next.js 应用
       └── 环境变量 NEXT_PUBLIC_API_URL
 ```
 
 ### 环境变量配置
 
-**必需配置：**
+**AWS Secrets Manager 配置：**
+```env
+knowledgehub/database-url: postgresql+asyncpg://...
+knowledgehub/openai-api-key: sk-...
+knowledgehub/qdrant-url: https://...
+knowledgehub/qdrant-api-key: ...
+knowledgehub/jwt-secret: ... (使用 scripts/generate_jwt_secret.py 生成)
+knowledgehub/frontend-url: https://...
+knowledgehub/backend-url: https://...
+knowledgehub/redis-url: redis://... (可选)
+knowledgehub/s3-bucket-name: knowledgehub-storage-...
+```
+
+**ECS 任务定义环境变量：**
 ```env
 MODE=production
-OPENAI_API_KEY=sk-...
-QDRANT_URL=https://...
-QDRANT_API_KEY=...
-JWT_SECRET_KEY=... (使用 scripts/generate_jwt_secret.py 生成)
-FRONTEND_URL=https://...
+PORT=8000
+API_PREFIX=/api/v1
+OPENAI_MODEL=gpt-4-turbo-preview
+OPENAI_EMBEDDING_MODEL=text-embedding-3-large
+QDRANT_COLLECTION_NAME=knowledge_base
+JWT_ALGORITHM=HS256
+JWT_EXPIRATION_HOURS=24
+LOG_LEVEL=INFO
 ```
 
-**自动配置（Railway）：**
-```env
-DATABASE_URL=postgresql://... (Railway PostgreSQL)
-REDIS_URL=redis://... (如果添加 Redis 服务)
-PORT=8000 (Railway 自动分配)
-```
+### 文件存储配置
 
-### Volume 配置
+**AWS S3（推荐）：**
+- 存储桶：`knowledgehub-storage-[账号ID]`
+- 权限：私有访问
+- IAM 角色：ECS 任务角色需要 S3 访问权限
 
-**挂载路径：** `/app/backend/storage`
-**最小大小：** 5GB
-**用途：** 存储上传的文档文件
+**AWS EFS（替代方案）：**
+- 挂载路径：`/app/backend/storage`
+- 文件系统：EFS 文件系统
+- 安全组：允许 NFS (2049) 端口
 
 ### 健康检查
 
