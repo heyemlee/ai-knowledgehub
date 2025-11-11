@@ -3,6 +3,7 @@
 .env.local
 .env.development
 .env.production
+aws.env
 
 # Python
 __pycache__/
@@ -44,6 +45,10 @@ yarn-error.log*
 
 # AWS
 .aws/
+aws/dist/
+aws/install
+aws/README.md
+aws/THIRD_PARTY_LICENSES
 
 # Logs
 logs/

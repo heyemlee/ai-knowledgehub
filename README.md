@@ -31,16 +31,25 @@ cd abc-ai-knowledgehub
 
 #### 2. 配置环境变量
 
-```bash
-# 创建 .env 文件
-touch .env
+在项目根目录创建 `.env` 文件：
 
-# 编辑 .env 文件，填入必需的配置
-# - OPENAI_API_KEY: OpenAI API 密钥
-# - QDRANT_URL: Qdrant Cloud URL
-# - QDRANT_API_KEY: Qdrant API Key
-# - JWT_SECRET_KEY: 使用 python scripts/generate_jwt_secret.py 生成
-# - DATABASE_URL: 数据库连接字符串（开发环境使用 SQLite，生产环境使用 PostgreSQL）
+```bash
+# 必需配置
+OPENAI_API_KEY=sk-your-openai-api-key
+QDRANT_URL=https://your-cluster-id.qdrant.io
+QDRANT_API_KEY=your-qdrant-api-key
+JWT_SECRET_KEY=$(python scripts/generate_jwt_secret.py)
+
+# 可选配置（开发环境使用默认值）
+MODE=development
+DATABASE_URL=sqlite+aiosqlite:///./knowledgehub.db  # 开发环境默认 SQLite
+FRONTEND_URL=http://localhost:3000
+```
+
+**生成 JWT Secret Key：**
+
+```bash
+python scripts/generate_jwt_secret.py
 ```
 
 #### 3. 启动后端
@@ -58,7 +67,7 @@ python scripts/init_db.py
 uvicorn app.main:app --reload --port 8000
 ```
 
-默认管理员账号：
+**默认管理员账号：**
 
 - 邮箱：`admin@abc.com`
 - 密码：`admin123`
@@ -76,6 +85,170 @@ npm run dev
 #### 5. 上传文档
 
 使用管理后台上传文档（点击右上角"管理后台"按钮）。
+
+## 🚢 AWS 云端部署
+
+### 前置准备
+
+1. **AWS 资源** - ECS 集群、ECR 仓库、RDS PostgreSQL、ALB 等（参考 [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md)）
+2. **AWS Secrets Manager** - 配置以下 secrets：
+   - `knowledgehub/database-url` - PostgreSQL 连接字符串
+   - `knowledgehub/openai-api-key` - OpenAI API 密钥
+   - `knowledgehub/qdrant-url` - Qdrant 集群 URL
+   - `knowledgehub/qdrant-api-key` - Qdrant API 密钥
+   - `knowledgehub/jwt-secret` - JWT 密钥（使用 `python scripts/generate_jwt_secret.py` 生成）
+   - `knowledgehub/frontend-url` - 前端域名（Vercel 部署后填入，例如：`https://your-project.vercel.app`）
+   - `knowledgehub/backend-url` - 后端 API 域名（ALB 地址）
+
+参考 `aws.env.example` 了解完整配置。
+
+> **注意：** 如果前端部署在 Vercel，`knowledgehub/frontend-url` 应设置为 Vercel 提供的域名，以确保 CORS 配置正确。
+
+### GitHub Actions 自动部署
+
+项目已配置 GitHub Actions 工作流，推送到 `main` 分支时自动部署到 AWS ECS。
+
+#### 配置 GitHub Secrets
+
+在 GitHub 仓库设置中添加以下 Secrets：
+
+- `AWS_ACCESS_KEY_ID` - AWS 访问密钥 ID
+- `AWS_SECRET_ACCESS_KEY` - AWS 访问密钥
+
+#### 工作流说明
+
+- **触发条件**：推送到 `main` 分支
+- **部署流程**：
+  1. 构建 Docker 镜像
+  2. 推送到 Amazon ECR
+  3. 更新 ECS 服务（强制新部署）
+  4. 验证服务状态
+
+#### 手动部署
+
+如需手动部署，可使用部署脚本：
+
+```bash
+./scripts/deploy-to-aws.sh build    # 构建并推送镜像
+./scripts/deploy-to-aws.sh deploy   # 触发 ECS 部署
+./scripts/deploy-to-aws.sh all      # 执行完整流程
+```
+
+### 初始化数据库
+
+部署后需要初始化数据库（创建管理员账号）：
+
+```bash
+# 通过 ECS 任务运行初始化脚本
+aws ecs run-task \
+  --cluster knowledgehub-cluster \
+  --task-definition knowledgehub-backend \
+  --launch-type FARGATE \
+  --network-configuration "awsvpcConfiguration={subnets=[subnet-xxx],securityGroups=[sg-xxx],assignPublicIp=ENABLED}" \
+  --overrides '{
+    "containerOverrides": [{
+      "name": "backend",
+      "command": ["python", "scripts/init_db.py"]
+    }]
+  }'
+```
+
+详细部署指南请参考 [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md)
+
+## 🌐 Vercel 前端部署
+
+### 前置准备
+
+1. **Vercel 账号** - 注册 [Vercel](https://vercel.com) 账号（免费）
+2. **GitHub 仓库** - 确保前端代码已推送到 GitHub
+3. **AWS 后端已部署** - 确保后端 API 已在 AWS 上正常运行
+
+### 部署步骤
+
+#### 1. 连接 GitHub 仓库到 Vercel
+
+1. 登录 [Vercel Dashboard](https://vercel.com/dashboard)
+2. 点击 **"Add New Project"**
+3. 选择你的 GitHub 仓库
+4. 配置项目设置：
+   - **Framework Preset:** Next.js
+   - **Root Directory:** `frontend`
+   - **Build Command:** `npm run build`（自动检测）
+   - **Output Directory:** `.next`（自动检测）
+
+#### 2. 配置环境变量
+
+在 Vercel 项目设置中添加以下环境变量：
+
+**必需配置：**
+
+- `NEXT_PUBLIC_API_URL` - AWS 后端 API 地址（例如：`https://api.yourdomain.com`）
+
+**可选配置：**
+
+- `NEXT_PUBLIC_MODE` - 运行模式（`production`）
+
+**配置步骤：**
+
+1. 在 Vercel 项目页面，进入 **Settings** → **Environment Variables**
+2. 添加环境变量：
+   ```
+   NEXT_PUBLIC_API_URL=https://your-backend-api-domain.com
+   ```
+3. 选择环境（Production、Preview、Development）
+4. 点击 **Save**
+
+#### 3. 部署
+
+1. 点击 **Deploy** 按钮
+2. Vercel 会自动构建并部署前端应用
+3. 部署完成后，Vercel 会提供一个域名（例如：`your-project.vercel.app`）
+
+#### 4. 配置 AWS 后端 CORS
+
+确保 AWS 后端的 CORS 配置允许 Vercel 域名访问：
+
+1. **更新 AWS Secrets Manager** 中的 `knowledgehub/frontend-url`：
+
+   ```bash
+   aws secretsmanager update-secret \
+     --secret-id knowledgehub/frontend-url \
+     --secret-string "https://your-project.vercel.app" \
+     --region us-west-1
+   ```
+
+2. **重启 ECS 服务** 使配置生效：
+   ```bash
+   aws ecs update-service \
+     --cluster knowledgehub-cluster \
+     --service knowledgehub-task-service-4vffj6ar \
+     --force-new-deployment \
+     --region us-west-1
+   ```
+
+#### 5. 自定义域名（可选）
+
+1. 在 Vercel 项目页面，进入 **Settings** → **Domains**
+2. 添加你的自定义域名（例如：`app.yourdomain.com`）
+3. 按照提示配置 DNS 记录
+4. 更新 `NEXT_PUBLIC_API_URL` 和 AWS Secrets Manager 中的 `frontend-url` 为新域名
+
+
+
+### 部署架构
+
+```
+GitHub Repository
+  ↓ (Push to main)
+Vercel CI/CD
+  ├── 自动构建 Next.js
+  ├── 部署到 Vercel Edge Network
+  └── 提供 HTTPS 域名
+  ↓
+用户浏览器
+  ↓ (API 请求)
+AWS ALB → ECS Fargate (后端 API)
+```
 
 ## 🏗️ 技术栈
 
@@ -96,10 +269,10 @@ npm run dev
 
 ### 存储
 
-- **本地文件存储** - 文档持久化（开发环境）
-- **S3/EFS** - AWS 生产环境文件存储
 - **SQLite** - 开发环境数据库
 - **PostgreSQL** - 生产环境数据库（AWS RDS）
+- **本地文件存储** - 开发环境文档存储
+- **S3/EFS** - AWS 生产环境文件存储
 
 ## 📁 项目结构
 
@@ -110,52 +283,22 @@ abc-ai-knowledgehub/
 │   │   ├── api/            # API 路由
 │   │   ├── core/           # 核心配置
 │   │   ├── db/             # 数据库模型
-│   │   ├── models/         # Pydantic 模型
 │   │   ├── services/       # 业务服务
 │   │   └── utils/          # 工具函数
-│   ├── storage/            # 本地文件存储
-│   └── requirements.txt
+│   └── Dockerfile          # Docker 镜像定义
 ├── frontend/               # 前端应用
 │   ├── app/               # Next.js App Router
 │   ├── components/        # React 组件
-│   ├── lib/               # 工具库
-│   └── store/             # 状态管理
+│   └── lib/               # 工具库
 ├── scripts/               # 工具脚本
 │   ├── init_db.py         # 初始化数据库
-│   ├── check_knowledge_base.py # 检查知识库
 │   ├── generate_jwt_secret.py # 生成JWT密钥
-│   └── reset_qdrant_collection.py # 重置Qdrant集合
-└── .env                   # 环境变量（需创建）
+│   └── deploy-to-aws.sh   # AWS部署脚本
+├── aws/                   # AWS 配置
+│   └── task-definition.json # ECS 任务定义
+└── .github/workflows/     # GitHub Actions
+    └── deploy.yml         # 自动部署工作流
 ```
-
-## 🎮 使用指南
-
-### 管理员功能
-
-1. **登录管理后台** - 点击聊天界面右上角"管理后台"按钮
-2. **文档管理** - 上传、查看、搜索、删除文档
-3. **用户管理** - 查看所有注册用户和统计信息
-
-### 普通用户功能
-
-1. **注册/登录** - 开发环境支持用户注册，生产环境需管理员邀请
-2. **智能问答** - 输入问题，AI 基于知识库回答，查看相关文档来源
-
-## 🚢 部署到 AWS
-
-详细的 AWS 部署指南请参考 [AWS_DEPLOYMENT.md](./AWS_DEPLOYMENT.md)
-
-### 快速部署步骤
-
-1. **准备 AWS 资源** - VPC、RDS PostgreSQL、S3、ECS 集群等
-2. **配置 Secrets Manager** - 存储敏感配置信息
-3. **构建和推送 Docker 镜像** - 推送到 ECR
-4. **创建 ECS 服务** - 配置任务定义和服务
-5. **配置应用负载均衡器** - 设置 ALB 和目标组
-6. **部署前端** - 使用 Vercel 或 AWS Amplify
-7. **初始化数据库** - 运行数据库初始化脚本
-
-更多详细信息请查看 [AWS 部署文档](./AWS_DEPLOYMENT.md)
 
 ## 🛠️ 常用脚本
 
@@ -173,6 +316,19 @@ python scripts/check_knowledge_base.py
 python scripts/reset_qdrant_collection.py
 ```
 
+## 🎮 使用指南
+
+### 管理员功能
+
+1. **登录管理后台** - 点击聊天界面右上角"管理后台"按钮
+2. **文档管理** - 上传、查看、搜索、删除文档
+3. **用户管理** - 查看所有注册用户和统计信息
+
+### 普通用户功能
+
+1. **注册/登录** - 开发环境支持用户注册，生产环境需管理员邀请
+2. **智能问答** - 输入问题，AI 基于知识库回答，查看相关文档来源
+
 ## 🔐 安全配置
 
 ### 生产环境必须配置
@@ -180,12 +336,7 @@ python scripts/reset_qdrant_collection.py
 1. **JWT Secret Key** - 使用 `python scripts/generate_jwt_secret.py` 生成强随机密钥
 2. **环境变量保护** - 永远不要提交 `.env` 文件到 Git
 3. **数据库安全** - 生产环境使用 PostgreSQL，启用 SSL 连接
-
-## 📚 详细文档
-
-- [架构文档](./ARCHITECTURE.md) - 详细的技术架构说明
-- [AWS 部署指南](./AWS_DEPLOYMENT.md) - 完整的 AWS 部署流程
-- [待办事项](./TODO.md) - 功能清单和开发计划
+4. **AWS Secrets Manager** - 使用 AWS Secrets Manager 存储敏感信息，不要硬编码
 
 ## 📝 License
 
