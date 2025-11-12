@@ -103,7 +103,7 @@ class Settings(BaseSettings):
         return url.replace("+aiosqlite", "").replace("+asyncpg", "")
     
     class Config:
-        env_file = ".env"
+        env_file = None
         case_sensitive = True
 
 
