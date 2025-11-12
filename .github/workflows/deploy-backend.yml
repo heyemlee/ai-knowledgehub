@@ -10,7 +10,6 @@ on:
 env:
   AWS_REGION: us-west-1
   ECR_REPOSITORY: knowledgehub-backend
-  ECS_SERVICE: knowledgehub-backend-service
   ECS_CLUSTER: knowledgehub-cluster
   ECS_TASK_DEFINITION: knowledgehub-backend
 
@@ -30,13 +29,13 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: ${{ env.AWS_REGION }}
 
-      # 🧩 新增：打印 AWS 身份信息（确保登录正确账户）
+      # 🧩 验证当前 AWS 环境
       - name: Verify AWS identity and region
         run: |
           echo "🔍 Checking AWS identity..."
           aws sts get-caller-identity
           echo "✅ Current AWS region: $AWS_REGION"
-          echo "🔍 Available ECR repositories:"
+          echo "🔍 Listing ECR repositories..."
           aws ecr describe-repositories --region $AWS_REGION || echo "⚠️ No ECR repositories found!"
 
       - name: Login to Amazon ECR
@@ -52,13 +51,24 @@ jobs:
           cd backend
           echo "🏗️ Building Docker image..."
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          echo "🏷️ Tagging image as latest..."
           docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
           echo "🚀 Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "✅ Image pushed successfully: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
+          echo "✅ Image pushed successfully!"
           echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+
+      # 🧩 根据分支选择部署的 ECS 服务
+      - name: Set ECS service dynamically
+        id: set-service
+        run: |
+          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
+            echo "ECS_SERVICE=knowledgehub-task-service-4vffj6ar" >> $GITHUB_ENV
+            echo "🟢 Deploying to PRODUCTION: knowledgehub-task-service-4vffj6ar"
+          else
+            echo "ECS_SERVICE=knowledgehub-backend-dev-service" >> $GITHUB_ENV
+            echo "🧪 Deploying to STAGING: knowledgehub-backend-dev-service"
+          fi
 
       - name: Fill in the new image ID in the Amazon ECS task definition
         id: task-def

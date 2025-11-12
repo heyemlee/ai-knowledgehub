@@ -2,7 +2,7 @@ name: Deploy knowledgehub-backend to AWS ECS
 
 on:
   push:
-    branches: [ main ]  # 触发分支，可改成你自己的主分支
+    branches: [ main ]  # 部署主分支
 
 jobs:
   deploy:
@@ -37,32 +37,4 @@ jobs:
           docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
           echo "📦 Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          echo "✅ Image pushed successfully."
-
-      # 5️⃣ 触发 ECS 更新部署
-      - name: Force new ECS deployment
-        env:
-          CLUSTER_NAME: knowledgehub-cluster
-          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
-        run: |
-          echo "🔄 Triggering ECS deployment..."
-          aws ecs update-service \
-            --cluster $CLUSTER_NAME \
-            --service $SERVICE_NAME \
-            --force-new-deployment \
-            --region us-west-1
-          echo "✅ ECS deployment triggered successfully."
-
-      # 6️⃣ （可选）验证 ECS 服务状态
-      - name: Verify ECS service status
-        env:
-          CLUSTER_NAME: knowledgehub-cluster
-          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
-        run: |
-          echo "🔍 Checking ECS service status..."
-          aws ecs describe-services \
-            --cluster $CLUSTER_NAME \
-            --services $SERVICE_NAME \
-            --region us-west-1 \
-            --query 'services[0].deployments[0].status'
-
+          echo
