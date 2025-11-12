@@ -8,8 +8,8 @@ from typing import List
 import os
 from dotenv import load_dotenv
 
-# ✅ 只在本地开发时加载 .env，生产环境依赖 ECS 环境变量
-if not os.getenv("AWS_EXECUTION_ENV"):
+if not os.getenv("AWS_EXECUTION_ENV") and os.getenv("MODE") != "production":
+    from dotenv import load_dotenv
     load_dotenv()
 
 
