@@ -2,20 +2,23 @@
 应用配置管理
 使用 pydantic-settings 管理环境变量
 """
+
 from pydantic_settings import BaseSettings
 from typing import List
 import os
 from dotenv import load_dotenv
 
-load_dotenv()
+# ✅ 只在本地开发时加载 .env，生产环境依赖 ECS 环境变量
+if os.getenv("MODE", "development") != "production":
+    load_dotenv()
 
 
 class Settings(BaseSettings):
     """应用配置"""
-    
+
     # 模式：development | production
     MODE: str = os.getenv("MODE", "development")
-    
+
     # API 配置
     API_PREFIX: str = os.getenv("API_PREFIX", "/api/v1")
     BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
