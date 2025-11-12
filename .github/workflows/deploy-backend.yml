@@ -1,87 +1,69 @@
-name: Deploy Backend to AWS ECS
+name: Deploy knowledgehub-backend to AWS ECS
 
 on:
   push:
-    branches: [main, dev]
-    paths:
-      - "backend/**"
-      - ".github/workflows/deploy-backend.yml"
-
-env:
-  AWS_REGION: us-west-1
-  ECR_REPOSITORY: knowledgehub-backend
-  ECS_CLUSTER: knowledgehub-cluster
-  ECS_TASK_DEFINITION: knowledgehub-backend
+    branches: [main] # 部署主分支
 
 jobs:
   deploy:
-    name: Deploy to ECS
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout code
+      # 1️⃣ 拉取 GitHub 源代码
+      - name: Checkout source code
         uses: actions/checkout@v4
 
+      # 2️⃣ 配置 AWS 凭证
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          aws-region: ${{ env.AWS_REGION }}
+          aws-region: us-west-1
 
-      # 🧩 验证当前 AWS 环境
-      - name: Verify AWS identity and region
-        run: |
-          echo "🔍 Checking AWS identity..."
-          aws sts get-caller-identity
-          echo "✅ Current AWS region: $AWS_REGION"
-          echo "🔍 Listing ECR repositories..."
-          aws ecr describe-repositories --region $AWS_REGION || echo "⚠️ No ECR repositories found!"
-
+      # 3️⃣ 登录 Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
+      # 4️⃣ 构建并推送镜像到 ECR
       - name: Build, tag, and push image to Amazon ECR
-        id: build-image
         env:
-          ECR_REGISTRY: ${{ steps.login-ecr.outputs.registry }}
-          IMAGE_TAG: ${{ github.sha }}
+          ECR_REGISTRY: 463056910651.dkr.ecr.us-west-1.amazonaws.com
+          ECR_REPOSITORY: knowledgehub-backend
+          IMAGE_TAG: latest
         run: |
-          cd backend
-          echo "🏗️ Building Docker image..."
-          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG .
-          docker tag $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "🚀 Pushing image to ECR..."
+          echo "🚀 Building Docker image..."
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+          echo "📦 Pushing image to ECR..."
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
-          docker push $ECR_REGISTRY/$ECR_REPOSITORY:latest
-          echo "✅ Image pushed successfully!"
-          echo "image=$ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG" >> $GITHUB_OUTPUT
+          echo "✅ Image pushed successfully: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-      # 🧩 根据分支选择部署的 ECS 服务
-      - name: Set ECS service dynamically
-        id: set-service
+      # 5️⃣ 强制 ECS 部署最新镜像
+      - name: Force new ECS deployment
+        env:
+          CLUSTER_NAME: knowledgehub-cluster
+          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
+          AWS_REGION: us-west-1
         run: |
-          if [[ "${GITHUB_REF##*/}" == "main" ]]; then
-            echo "ECS_SERVICE=knowledgehub-task-service-4vffj6ar" >> $GITHUB_ENV
-            echo "🟢 Deploying to PRODUCTION: knowledgehub-task-service-4vffj6ar"
-          else
-            echo "ECS_SERVICE=knowledgehub-backend-dev-service" >> $GITHUB_ENV
-            echo "🧪 Deploying to STAGING: knowledgehub-backend-dev-service"
-          fi
+          echo "🔄 Triggering ECS deployment..."
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --region $AWS_REGION
+          echo "✅ ECS deployment triggered successfully."
 
-      - name: Fill in the new image ID in the Amazon ECS task definition
-        id: task-def
-        uses: aws-actions/amazon-ecs-render-task-definition@v1
-        with:
-          task-definition: aws/task-definition.json
-          container-name: backend
-          image: ${{ steps.build-image.outputs.image }}
-
-      - name: Deploy Amazon ECS task definition
-        uses: aws-actions/amazon-ecs-deploy-task-definition@v1
-        with:
-          task-definition: ${{ steps.task-def.outputs.task-definition }}
-          service: ${{ env.ECS_SERVICE }}
-          cluster: ${{ env.ECS_CLUSTER }}
-          wait-for-service-stability: true
+      # 6️⃣ 验证 ECS 服务状态
+      - name: Verify ECS service status
+        env:
+          CLUSTER_NAME: knowledgehub-cluster
+          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
+          AWS_REGION: us-west-1
+        run: |
+          echo "🔍 Checking ECS service status..."
+          aws ecs describe-services \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region $AWS_REGION \
+            --query 'services[0].deployments[0].status'
