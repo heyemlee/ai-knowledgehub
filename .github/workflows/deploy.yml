@@ -1,0 +1,68 @@
+name: Deploy knowledgehub-backend to AWS ECS
+
+on:
+  push:
+    branches: [ main ]  # 触发分支，可改成你自己的主分支
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      # 1️⃣ 拉取 GitHub 源代码
+      - name: Checkout source code
+        uses: actions/checkout@v4
+
+      # 2️⃣ 配置 AWS 凭证
+      - name: Configure AWS credentials
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: us-west-1
+
+      # 3️⃣ 登录 Amazon ECR
+      - name: Login to Amazon ECR
+        id: login-ecr
+        uses: aws-actions/amazon-ecr-login@v2
+
+      # 4️⃣ 构建并推送镜像到 ECR
+      - name: Build, tag, and push image to Amazon ECR
+        env:
+          ECR_REGISTRY: 463056910651.dkr.ecr.us-west-1.amazonaws.com
+          ECR_REPOSITORY: knowledgehub-backend
+          IMAGE_TAG: latest
+        run: |
+          echo "🚀 Building Docker image..."
+          docker build -t $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG ./backend
+          echo "📦 Pushing image to ECR..."
+          docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
+          echo "✅ Image pushed successfully."
+
+      # 5️⃣ 触发 ECS 更新部署
+      - name: Force new ECS deployment
+        env:
+          CLUSTER_NAME: knowledgehub-cluster
+          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
+        run: |
+          echo "🔄 Triggering ECS deployment..."
+          aws ecs update-service \
+            --cluster $CLUSTER_NAME \
+            --service $SERVICE_NAME \
+            --force-new-deployment \
+            --region us-west-1
+          echo "✅ ECS deployment triggered successfully."
+
+      # 6️⃣ （可选）验证 ECS 服务状态
+      - name: Verify ECS service status
+        env:
+          CLUSTER_NAME: knowledgehub-cluster
+          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
+        run: |
+          echo "🔍 Checking ECS service status..."
+          aws ecs describe-services \
+            --cluster $CLUSTER_NAME \
+            --services $SERVICE_NAME \
+            --region us-west-1 \
+            --query 'services[0].deployments[0].status'
+
