@@ -50,7 +50,7 @@ ENV PYTHONDONTWRITEBYTECODE=1
 
 # 健康检查
 HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
-    CMD curl -f http://localhost:8000/api/v1/health || exit 1
+    CMD curl -f http://localhost:8000/health || exit 1
 
 # 使用 Gunicorn + Uvicorn workers 启动（生产模式）
 # workers 数量根据 CPU 核心数自动调整，建议设置为 (2 * CPU核心数) + 1
