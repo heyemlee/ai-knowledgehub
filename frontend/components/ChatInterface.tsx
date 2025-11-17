@@ -5,7 +5,6 @@ import { useRouter } from 'next/navigation'
 import { chatAPI, ChatResponse, conversationsAPI, Message } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
 import { isAdmin } from '@/lib/auth'
-import { useTranslations } from '@/lib/translations'
 import ConversationHistory from './ConversationHistory'
 import UserProfile from './UserProfile'
 import AdminPanel from './AdminPanel'
@@ -15,8 +14,7 @@ import { Send, LogOut, User, Settings } from 'lucide-react'
 import { toast } from './Toast'
 
 export default function ChatInterface() {
-  const { t, locale } = useTranslations()
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
+    const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
@@ -61,7 +59,7 @@ export default function ChatInterface() {
       setConversationId(convId)
     } catch (error) {
       console.error('加载对话消息失败:', error)
-      toast.error(t('chat.loadingError'))
+      toast.error('Failed to load conversation, please try again later')
     } finally {
       setLoadingMessages(false)
     }
@@ -95,7 +93,6 @@ export default function ChatInterface() {
         conversation_id: conversationId || undefined,
         temperature: 0.7,
         max_tokens: 1000,
-        locale: locale,  // 传递用户当前语言
       })) {
         if (chunk.error) {
           throw new Error(chunk.content)
@@ -134,7 +131,7 @@ export default function ChatInterface() {
         ...prev,
         {
           role: 'assistant',
-          content: `错误: ${error.message || t('chat.errorMessage')}`,
+          content: `Error: ${error.message || 'Request failed, please try again later'}`,
         },
       ])
       setStreamingContent('')
@@ -174,7 +171,7 @@ export default function ChatInterface() {
                 className="flex items-center gap-2 px-4 py-2 text-sm bg-black text-white hover:bg-gray-800 rounded-lg transition-colors"
               >
                 <Settings size={16} />
-                <span className="hidden sm:inline">{t('chat.admin')}</span>
+                <span className="hidden sm:inline">Admin</span>
               </button>
             )}
             <button
@@ -206,10 +203,10 @@ export default function ChatInterface() {
                   </div>
                 </div>
                 <h2 className="text-3xl font-bold mb-3 text-black">
-                  {t('chat.whatDoYouWant')}
+                  What do you want to know?
                 </h2>
                 <p className="text-gray-500 text-base">
-                  {t('chat.assistantDescription')}
+                  AI intelligent answer assistant
                 </p>
               </div>
             </div>
@@ -272,7 +269,7 @@ export default function ChatInterface() {
                 value={input}
                 onChange={(e) => setInput(e.target.value)}
                 onKeyDown={handleKeyPress}
-                placeholder={t('chat.placeholder')}
+                placeholder="What do you want to know?"
                 disabled={streaming}
                 className="w-full px-5 py-4 pr-14 bg-white border border-gray-200 rounded-2xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400 resize-none"
                 rows={1}
@@ -294,7 +291,7 @@ export default function ChatInterface() {
               </button>
             </div>
             <p className="text-xs text-gray-400 mt-3 text-center">
-              {t('chat.disclaimer')}
+              AI may make mistakes. Please verify important information.
             </p>
           </div>
         </div>
