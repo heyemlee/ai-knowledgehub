@@ -7,5 +7,9 @@ const nextConfig = {
   },
 }
 
-module.exports = nextConfig
+const createNextIntlPlugin = require('next-intl/plugin');
+
+const withNextIntl = createNextIntlPlugin('./src/i18n/server/request.ts');
+
+module.exports = withNextIntl(nextConfig);
 
