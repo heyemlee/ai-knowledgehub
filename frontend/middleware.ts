@@ -1,34 +1,37 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
-// 支持的语言列表
 const locales = ['zh-CN', 'en-US']
 const defaultLocale = 'en-US'
 
 export function middleware(request: NextRequest) {
   const pathname = request.nextUrl.pathname
 
-  // 根路径，已经有 page.tsx 处理重定向
-  if (pathname === '/') {
+  // 已经是带 locale 的路径，直接放行
+  if (locales.some((loc) => pathname.startsWith(`/${loc}/`) || pathname === `/${loc}`)) {
     return NextResponse.next()
   }
 
-  // 提取第一个路径段作为 locale
-  const segments = pathname.split('/')
-  const potentialLocale = segments[1]
+  // 静态资源自动跳过
+  if (pathname.startsWith('/_next') || pathname.startsWith('/favicon.ico')) {
+    return NextResponse.next()
+  }
 
-  // 检查是否是有效的语言代码
-  if (potentialLocale && !locales.includes(potentialLocale)) {
-    // 如果不是有效的语言代码，重定向到默认语言 + 原路径
+  // 根路径 → 重定向到默认语言
+  if (pathname === '/') {
     const url = request.nextUrl.clone()
-    url.pathname = `/${defaultLocale}${pathname}`
+    url.pathname = `/${defaultLocale}`
     return NextResponse.redirect(url)
   }
 
-  return NextResponse.next()
+  // 非法路径：自动补上 locale
+  const url = request.nextUrl.clone()
+  url.pathname = `/${defaultLocale}${pathname}`
+  return NextResponse.redirect(url)
 }
 
 export const config = {
-  // 匹配所有路径，除了 api、_next/static、_next/image、favicon.ico
-  matcher: ['/((?!api|_next/static|_next/image|favicon.ico).*)'],
+  matcher: [
+    '/((?!api|_next/static|_next/image|_next/data|favicon.ico).*)',
+  ],
 }
