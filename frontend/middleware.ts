@@ -1,6 +1,8 @@
 import { NextResponse } from 'next/server'
 import type { NextRequest } from 'next/server'
 
+export const runtime = 'nodejs';
+
 export function middleware(request: NextRequest) {
   // 简单放行所有请求
   return NextResponse.next()
