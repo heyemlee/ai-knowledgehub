@@ -1,49 +1,31 @@
-import type { Metadata } from 'next'
-import { Inter } from 'next/font/google'
-import { ToastContainer } from '@/components/Toast'
-import { ConfirmDialogContainer } from '@/components/ConfirmDialog'
+export const runtime = "nodejs";
 
-const inter = Inter({ subsets: ['latin'] })
+import {NextIntlClientProvider} from 'next-intl';
+import {getMessages} from 'next-intl/server';
+import {Inter} from 'next/font/google';
+import {ToastContainer} from '@/components/Toast';
+import {ConfirmDialogContainer} from '@/components/ConfirmDialog';
 
-export const metadata: Metadata = {
-  title: 'ABC AI Knowledge Hub',
-  description: '企业级知识库系统 - 智能问答平台',
-}
+const inter = Inter({subsets: ['latin']});
 
-export default function LocaleLayout({
+export default async function LocaleLayout({
   children,
-  params: { locale }
+  params: {locale}
 }: {
-  children: React.ReactNode
-  params: { locale: string }
+  children: React.ReactNode;
+  params: {locale: string};
 }) {
+  const messages = await getMessages();
+
   return (
     <html lang={locale}>
       <body className={inter.className}>
-        {children}
+        <NextIntlClientProvider messages={messages}>
+          {children}
+        </NextIntlClientProvider>
         <ToastContainer />
         <ConfirmDialogContainer />
       </body>
     </html>
-  )
+  );
 }
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-
