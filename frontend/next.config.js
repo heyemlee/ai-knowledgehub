@@ -6,6 +6,7 @@ const nextConfig = {
     NEXT_PUBLIC_MODE: process.env.NEXT_PUBLIC_MODE || 'development',
   },
   experimental: {
+    runtime: 'nodejs',
     serverComponentsExternalPackages: [],
   },
 }
