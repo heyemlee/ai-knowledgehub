@@ -1,10 +1,6 @@
-import createMiddleware from 'next-intl/middleware';
-
-export default createMiddleware({
-  locales: ['en-US', 'zh-CN'],
-  defaultLocale: 'en-US'
-});
+// Temporarily disable next-intl middleware to fix __dirname issue
+// We'll handle routing manually in the app
 
 export const config = {
-  matcher: ['/((?!api|_next|_vercel|.*\\..*).*)']
+  matcher: []
 };
