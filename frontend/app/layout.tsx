@@ -1,5 +1,3 @@
-export const runtime = "nodejs";
-
 export default function RootLayout({
   children,
 }: {
