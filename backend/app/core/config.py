@@ -82,11 +82,13 @@ class Settings(BaseSettings):
     CLOUDWATCH_LOG_GROUP: str = os.getenv("CLOUDWATCH_LOG_GROUP", "knowledgehub-logs")
     
     # 数据库配置
-    DATABASE_URL: str = os.getenv(
-        "DATABASE_URL",
-        "sqlite+aiosqlite:///./knowledgehub.db" if os.getenv("MODE", "development") == "development" 
-        else os.getenv("DATABASE_URL", "")
-    )
+    @property
+    def DATABASE_URL(self) -> str:
+        database_url = os.getenv("DATABASE_URL")
+        if database_url:
+            return database_url
+        # 如果没有设置 DATABASE_URL，使用 SQLite 作为默认值
+        return "sqlite+aiosqlite:///./knowledgehub.db"
     
     # Redis 配置（可选，用于缓存）
     REDIS_URL: str = os.getenv("REDIS_URL", "")

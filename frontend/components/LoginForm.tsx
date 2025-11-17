@@ -2,10 +2,8 @@
 
 import { useState } from 'react'
 import { useAuthStore } from '@/store/authStore'
-import { useTranslations } from '@/lib/translations'
 
 export default function LoginForm() {
-  const { t } = useTranslations()
   const [isRegister, setIsRegister] = useState(false)
   const [email, setEmail] = useState('')
   const [password, setPassword] = useState('')
@@ -29,7 +27,7 @@ export default function LoginForm() {
     } catch (err: any) {
       console.error('认证错误:', err)
       
-      let errorMessage = isRegister ? t('login.registerFailed') : t('login.loginFailed')
+      let errorMessage = isRegister ? 'Registration failed, please check your information' : 'Login failed, please check email and password'
       
       if (err.response?.data?.detail) {
         const detail = err.response.data.detail
@@ -37,7 +35,7 @@ export default function LoginForm() {
         if (Array.isArray(detail)) {
           errorMessage = detail.map((item: any) => {
             const field = item.loc?.[1] || 'field'
-            const msg = item.msg || t('login.validationFailed')
+            const msg = item.msg || 'Validation failed'
             return `${field}: ${msg}`
           }).join(', ')
         } 
@@ -64,7 +62,7 @@ export default function LoginForm() {
             ABC AI Hub
           </h1>
           <p className="text-gray-500 text-sm">
-            {t('login.title')}
+            AI Intelligent Answer Assistant
           </p>
         </div>
 
@@ -84,7 +82,7 @@ export default function LoginForm() {
                   : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {t('login.login')}
+              Login
             </button>
             <button
               type="button"
@@ -98,7 +96,7 @@ export default function LoginForm() {
                   : 'text-gray-500 hover:text-gray-900'
               }`}
             >
-              {t('login.register')}
+              Register
             </button>
           </div>
 
@@ -112,8 +110,8 @@ export default function LoginForm() {
             {isRegister && (
               <div>
                 <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                  {t('login.name')}
-                  <span className="text-gray-400 text-xs ml-2">{t('login.nameOptional')}</span>
+                  Name
+                  <span className="text-gray-400 text-xs ml-2">(optional)</span>
                 </label>
                 <input
                   id="fullName"
@@ -121,14 +119,14 @@ export default function LoginForm() {
                   value={fullName}
                   onChange={(e) => setFullName(e.target.value)}
                   className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
-                  placeholder={t('login.namePlaceholder')}
+                  placeholder="Your name"
                 />
               </div>
             )}
 
             <div>
               <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                {t('login.email')}
+                Email
               </label>
               <input
                 id="email"
@@ -137,13 +135,13 @@ export default function LoginForm() {
                 onChange={(e) => setEmail(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
-                placeholder={t('login.emailPlaceholder')}
+                placeholder="your.email@example.com"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                {t('login.password')}
+                Password
               </label>
               <input
                 id="password"
@@ -152,7 +150,7 @@ export default function LoginForm() {
                 onChange={(e) => setPassword(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
-                placeholder={t('login.passwordPlaceholder')}
+                placeholder="Enter your password"
               />
             </div>
 
@@ -167,10 +165,10 @@ export default function LoginForm() {
                     <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" fill="none" />
                     <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
                   </svg>
-                  {isRegister ? t('login.registering') : t('login.loggingIn')}
+                  {isRegister ? 'Registering...' : 'Logging in...'}
                 </span>
               ) : (
-                isRegister ? t('login.register') : t('login.login')
+                isRegister ? 'Register' : 'Login'
               )}
             </button>
           </form>

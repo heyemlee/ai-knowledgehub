@@ -2,7 +2,6 @@
 
 import { useState, useEffect } from 'react'
 import { conversationsAPI, Conversation } from '@/lib/api'
-import { useTranslations } from '@/lib/translations'
 import { MessageSquare, Trash2, Loader2, Plus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { toast } from './Toast'
 import { confirm } from './ConfirmDialog'
@@ -20,7 +19,6 @@ export default function ConversationHistory({
   onNewConversation,
   refreshTrigger,
 }: ConversationHistoryProps) {
-  const { t, locale } = useTranslations()
   const [conversations, setConversations] = useState<Conversation[]>([])
   const [loading, setLoading] = useState(true)
   const [deletingId, setDeletingId] = useState<string | null>(null)
@@ -56,13 +54,13 @@ export default function ConversationHistory({
       }
       
       // 转换为洛杉矶时区
-      return date.toLocaleString(locale === 'zh-CN' ? 'zh-CN' : 'en-US', {
+      return date.toLocaleString('en-US', {
         month: 'numeric',
         day: 'numeric',
         hour: '2-digit',
         minute: '2-digit',
         timeZone: 'America/Los_Angeles',
-        hour12: locale === 'en-US', // 英文使用12小时制，中文使用24小时制
+        hour12: true, // 使用12小时制
       })
     } catch (error) {
       console.error('Error formatting date:', dateString, error)
@@ -88,10 +86,10 @@ export default function ConversationHistory({
 
   const handleDelete = async (e: React.MouseEvent, conversationId: string) => {
     e.stopPropagation()
-    const confirmed = await confirm(t('conversation.deleteConfirm'), {
-      title: t('common.delete'),
-      confirmText: t('common.delete'),
-      cancelText: t('common.cancel'),
+    const confirmed = await confirm('Are you sure you want to delete this conversation?', {
+      title: 'Delete',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
     })
     
     if (!confirmed) return
@@ -103,10 +101,10 @@ export default function ConversationHistory({
       if (currentConversationId === conversationId) {
         onNewConversation()
       }
-      toast.success(t('conversation.deleteSuccess'))
+      toast.success('Delete successful')
     } catch (error) {
       console.error('删除对话失败:', error)
-      toast.error(t('conversation.deleteFailed'))
+      toast.error('Failed to delete conversation, please try again later')
     } finally {
       setDeletingId(null)
     }
@@ -120,7 +118,7 @@ export default function ConversationHistory({
       <button
         onClick={() => setIsCollapsed(!isCollapsed)}
         className="absolute -right-3 top-6 z-10 w-6 h-6 bg-white border border-gray-200 rounded-full flex items-center justify-center hover:bg-gray-50 transition-colors shadow-sm"
-        title={isCollapsed ? t('conversation.expandSidebar') : t('conversation.collapseSidebar')}
+        title={isCollapsed ? 'Expand sidebar' : 'Collapse sidebar'}
       >
         {isCollapsed ? (
           <ChevronRight size={14} className="text-gray-600" />
@@ -137,7 +135,7 @@ export default function ConversationHistory({
             className="w-full px-4 py-3 bg-black hover:bg-gray-800 text-white rounded-xl transition-all text-sm font-medium flex items-center justify-center gap-2"
           >
             <Plus size={18} />
-            {t('conversation.newConversation')}
+            New Conversation
           </button>
         </div>
 
@@ -158,7 +156,7 @@ export default function ConversationHistory({
               <div className="w-12 h-12 bg-gray-100 rounded-xl flex items-center justify-center mx-auto mb-4">
                 <MessageSquare className="w-6 h-6 text-gray-400" />
               </div>
-              <p className="text-gray-500 text-sm">{t('conversation.noConversations')}</p>
+              <p className="text-gray-500 text-sm">No conversation history</p>
             </div>
           ) : (
             <div className="p-3 space-y-1">
@@ -175,7 +173,7 @@ export default function ConversationHistory({
                   <div className="flex items-start justify-between gap-3">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-medium text-gray-900 truncate mb-1">
-                        {conv.title || t('conversation.newConversation')}
+                        {conv.title || 'New Conversation'}
                       </p>
                       <p className="text-xs text-gray-500">
                         {formatLosAngelesTime(conv.updated_at)}
@@ -185,7 +183,7 @@ export default function ConversationHistory({
                       onClick={(e) => handleDelete(e, conv.conversation_id)}
                       disabled={deletingId === conv.conversation_id}
                       className="opacity-0 group-hover:opacity-100 p-1.5 hover:bg-red-50 rounded-lg transition-all"
-                      title={t('common.delete')}
+                      title="Delete"
                     >
                       {deletingId === conv.conversation_id ? (
                         <Loader2 className="w-4 h-4 animate-spin text-red-500" />
@@ -207,7 +205,7 @@ export default function ConversationHistory({
           <button
             onClick={onNewConversation}
             className="p-3 bg-black hover:bg-gray-800 text-white rounded-xl transition-all"
-            title={t('conversation.newConversation')}
+            title="New Conversation"
           >
             <Plus size={18} />
           </button>
@@ -221,7 +219,7 @@ export default function ConversationHistory({
                     ? 'bg-black text-white'
                     : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
                 }`}
-                title={conv.title || t('conversation.newConversation')}
+                title={conv.title || 'New Conversation'}
               >
                 <MessageSquare size={16} />
               </button>

@@ -1,11 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useRouter, usePathname } from 'next/navigation'
 import { tokenUsageAPI, TokenUsageStats } from '@/lib/api'
 import { useAuthStore } from '@/store/authStore'
-import { useTranslations } from '@/lib/translations'
-import { X, User, TrendingUp, Calendar, RefreshCw, Loader2, Languages } from 'lucide-react'
+import { X, User, TrendingUp, Calendar, RefreshCw, Loader2 } from 'lucide-react'
 
 interface UserProfileProps {
   onClose: () => void
@@ -13,46 +11,9 @@ interface UserProfileProps {
 
 export default function UserProfile({ onClose }: UserProfileProps) {
   const { user } = useAuthStore()
-  const router = useRouter()
-  const pathname = usePathname()
-  const { t, locale: currentLocale } = useTranslations()
   const [stats, setStats] = useState<TokenUsageStats | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [showLanguageMenu, setShowLanguageMenu] = useState(false)
-
-  // 切换语言
-  const switchLanguage = (locale: 'zh-CN' | 'en-US') => {
-    if (locale === currentLocale) {
-      setShowLanguageMenu(false)
-      return
-    }
-    const segments = pathname.split('/')
-    // 移除当前的 locale，保留其余路径
-    const remainingPath = segments.slice(2).join('/')
-    const newPath = `/${locale}${remainingPath ? '/' + remainingPath : ''}`
-    setShowLanguageMenu(false)
-    router.push(newPath)
-    // 刷新页面以确保所有组件重新渲染
-    router.refresh()
-  }
-
-  // 点击外部关闭菜单
-  useEffect(() => {
-    const handleClickOutside = (event: MouseEvent) => {
-      const target = event.target as HTMLElement
-      if (!target.closest('.language-switcher-container')) {
-        setShowLanguageMenu(false)
-      }
-    }
-
-    if (showLanguageMenu) {
-      document.addEventListener('mousedown', handleClickOutside)
-      return () => {
-        document.removeEventListener('mousedown', handleClickOutside)
-      }
-    }
-  }, [showLanguageMenu])
 
   const loadStats = async () => {
     try {
@@ -61,8 +22,8 @@ export default function UserProfile({ onClose }: UserProfileProps) {
       const data = await tokenUsageAPI.getStats()
       setStats(data)
     } catch (err: any) {
-      console.error('加载使用量统计失败:', err)
-      setError(err.response?.data?.detail || t('profile.loadError'))
+      console.error('Failed to load usage statistics:', err)
+      setError(err.response?.data?.detail || 'Failed to load, please try again later')
     } finally {
       setLoading(false)
     }
@@ -99,161 +60,117 @@ export default function UserProfile({ onClose }: UserProfileProps) {
           <div className="flex items-center gap-3">
             <User className="w-6 h-6 text-blue-600" />
             <div>
-              <h2 className="text-xl font-semibold text-gray-800">{t('profile.personalCenter')}</h2>
+              <h2 className="text-xl font-semibold text-gray-800">Personal Center</h2>
               <p className="text-sm text-gray-500">{user?.email}</p>
             </div>
           </div>
-          <div className="flex items-center gap-2">
-            {/* Language Switcher */}
-            <div className="relative language-switcher-container">
-              <button
-                onClick={() => setShowLanguageMenu(!showLanguageMenu)}
-                className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-                title={currentLocale === 'zh-CN' ? 'Language' : '语言'}
-              >
-                <Languages className="w-5 h-5" />
-              </button>
-              {showLanguageMenu && (
-                <div className="absolute right-0 top-full mt-2 bg-white rounded-lg shadow-lg border border-gray-200 py-1 min-w-[120px] z-10">
-                  <button
-                    onClick={() => switchLanguage('en-US')}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      currentLocale === 'en-US' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
-                    }`}
-                  >
-                    English
-                  </button>
-                  <button
-                    onClick={() => switchLanguage('zh-CN')}
-                    className={`w-full px-4 py-2 text-left text-sm hover:bg-gray-100 transition-colors ${
-                      currentLocale === 'zh-CN' ? 'bg-blue-50 text-blue-600 font-medium' : 'text-gray-700'
-                    }`}
-                  >
-                    中文
-                  </button>
-                </div>
-              )}
-            </div>
-            <button
-              onClick={loadStats}
-              disabled={loading}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title={t('common.refresh')}
-            >
-              {loading ? (
-                <Loader2 className="w-5 h-5 animate-spin" />
-              ) : (
-                <RefreshCw className="w-5 h-5" />
-              )}
-            </button>
-            <button
-              onClick={onClose}
-              className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
-              title={t('common.close')}
-            >
-              <X size={20} />
-            </button>
-          </div>
+          <button
+            onClick={onClose}
+            className="p-2 text-gray-400 hover:text-gray-600 hover:bg-gray-100 rounded-lg transition-colors"
+          >
+            <X className="w-5 h-5" />
+          </button>
         </div>
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-6">
-          {loading && !stats ? (
-            <div className="flex items-center justify-center py-20">
-              <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
-            </div>
-          ) : error ? (
-            <div className="text-center py-20">
-              <p className="text-red-500 mb-4">{error}</p>
+          {/* Usage Stats */}
+          <div className="mb-8">
+            <div className="flex items-center justify-between mb-6">
+              <h3 className="text-lg font-semibold text-gray-800">Usage Statistics</h3>
               <button
                 onClick={loadStats}
-                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                disabled={loading}
+                className="flex items-center gap-2 px-3 py-1.5 text-sm text-blue-600 hover:bg-blue-50 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
               >
-                {t('common.retry')}
+                <RefreshCw className={`w-4 h-4 ${loading ? 'animate-spin' : ''}`} />
+                Refresh
               </button>
             </div>
-          ) : stats ? (
-            <div className="space-y-6">
-              {/* 每日使用量 */}
-              <div className="bg-gradient-to-br from-blue-50 to-indigo-50 rounded-lg p-6 border border-blue-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
+
+            {error && (
+              <div className="mb-6 p-4 bg-red-50 border border-red-200 text-red-600 rounded-lg text-sm">
+                {error}
+              </div>
+            )}
+
+            {loading ? (
+              <div className="flex items-center justify-center py-12">
+                <Loader2 className="w-8 h-8 animate-spin text-blue-600" />
+              </div>
+            ) : stats ? (
+              <div className="space-y-6">
+                {/* Daily Usage */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
                     <Calendar className="w-5 h-5 text-blue-600" />
-                    <h3 className="text-lg font-semibold text-gray-800">{t('profile.dailyUsage')}</h3>
+                    <h4 className="font-medium text-gray-800">Daily Usage</h4>
                   </div>
-                  <span className="text-sm text-gray-600">
-                    {formatNumber(stats.daily_usage)} / {formatNumber(stats.daily_limit)} tokens
-                  </span>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">Used</span>
+                        <span className="font-medium">{formatNumber(stats.daily_usage)}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`${getProgressColor(getPercentage(stats.daily_usage, stats.daily_limit))} h-2 rounded-full transition-all duration-300`}
+                          style={{ width: `${getPercentage(stats.daily_usage, stats.daily_limit)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>{formatNumber(stats.daily_usage)}</span>
+                        <span>Limit: {formatNumber(stats.daily_limit)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                
-                <div className="mb-2">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>{t('profile.used')}: {formatNumber(stats.daily_usage)}</span>
-                    <span>{t('profile.remaining')}: {formatNumber(stats.daily_remaining)}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-500 ${getProgressColor(getPercentage(stats.daily_usage, stats.daily_limit))}`}
-                      style={{ width: `${getPercentage(stats.daily_usage, stats.daily_limit)}%` }}
-                    />
-                  </div>
-                </div>
-                
-                <p className="text-xs text-gray-500 mt-2">
-                  {t('profile.usageRate')}: {getPercentage(stats.daily_usage, stats.daily_limit).toFixed(1)}%
-                </p>
-              </div>
 
-              {/* 每月使用量 */}
-              <div className="bg-gradient-to-br from-purple-50 to-pink-50 rounded-lg p-6 border border-purple-100">
-                <div className="flex items-center justify-between mb-4">
-                  <div className="flex items-center gap-2">
-                    <TrendingUp className="w-5 h-5 text-purple-600" />
-                    <h3 className="text-lg font-semibold text-gray-800">{t('profile.monthlyUsage')}</h3>
+                {/* Monthly Usage */}
+                <div className="bg-gray-50 rounded-lg p-4">
+                  <div className="flex items-center gap-2 mb-3">
+                    <TrendingUp className="w-5 h-5 text-green-600" />
+                    <h4 className="font-medium text-gray-800">Monthly Usage</h4>
                   </div>
-                  <span className="text-sm text-gray-600">
-                    {formatNumber(stats.monthly_usage)} / {formatNumber(stats.monthly_limit)} tokens
-                  </span>
+                  <div className="space-y-3">
+                    <div>
+                      <div className="flex justify-between text-sm mb-1">
+                        <span className="text-gray-600">Used</span>
+                        <span className="font-medium">{formatNumber(stats.monthly_usage)}</span>
+                      </div>
+                      <div className="w-full bg-gray-200 rounded-full h-2">
+                        <div
+                          className={`${getProgressColor(getPercentage(stats.monthly_usage, stats.monthly_limit))} h-2 rounded-full transition-all duration-300`}
+                          style={{ width: `${getPercentage(stats.monthly_usage, stats.monthly_limit)}%` }}
+                        />
+                      </div>
+                      <div className="flex justify-between text-xs text-gray-500 mt-1">
+                        <span>{formatNumber(stats.monthly_usage)}</span>
+                        <span>Limit: {formatNumber(stats.monthly_limit)}</span>
+                      </div>
+                    </div>
+                  </div>
                 </div>
-                
-                <div className="mb-2">
-                  <div className="flex justify-between text-sm text-gray-600 mb-1">
-                    <span>{t('profile.used')}: {formatNumber(stats.monthly_usage)}</span>
-                    <span>{t('profile.remaining')}: {formatNumber(stats.monthly_remaining)}</span>
-                  </div>
-                  <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
-                    <div
-                      className={`h-full transition-all duration-500 ${getProgressColor(getPercentage(stats.monthly_usage, stats.monthly_limit))}`}
-                      style={{ width: `${getPercentage(stats.monthly_usage, stats.monthly_limit)}%` }}
-                    />
-                  </div>
-                </div>
-                
-                <p className="text-xs text-gray-500 mt-2">
-                  {t('profile.usageRate')}: {getPercentage(stats.monthly_usage, stats.monthly_limit).toFixed(1)}%
-                </p>
               </div>
+            ) : (
+              <div className="text-center py-12 text-gray-500">
+                No usage data available
+              </div>
+            )}
+          </div>
 
-              {/* 使用说明 */}
-              <div className="bg-gray-50 rounded-lg p-4 border border-gray-200">
-                <h4 className="text-sm font-semibold text-gray-700 mb-2">{t('profile.instructions')}</h4>
-                <ul className="text-xs text-gray-600 space-y-1">
-                  <li>• {t('profile.instruction1')}</li>
-                  <li>• {t('profile.instruction2')}</li>
-                  <li>• {t('profile.instruction3')}</li>
-                  <li>• {t('profile.instruction4')}</li>
-                </ul>
-              </div>
-            </div>
-          ) : null}
+          {/* Instructions */}
+          <div className="bg-blue-50 rounded-lg p-4">
+            <h4 className="font-medium text-gray-800 mb-3">Instructions</h4>
+            <ul className="text-sm text-gray-600 space-y-2">
+              <li>• Daily limit resets at 00:00 UTC</li>
+              <li>• Monthly limit resets on the 1st of each month</li>
+              <li>• Token usage updates in real-time with your Q&A requests</li>
+              <li>• Contact administrator when limit is reached or wait for reset</li>
+            </ul>
+          </div>
         </div>
       </div>
     </div>
   )
 }
-
-
-
-
-
-
