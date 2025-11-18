@@ -8,8 +8,8 @@ from typing import List
 import os
 from dotenv import load_dotenv
 
+# 本地环境加载 .env
 if not os.getenv("AWS_EXECUTION_ENV") and os.getenv("MODE") != "production":
-    from dotenv import load_dotenv
     load_dotenv()
 
 
@@ -41,25 +41,23 @@ class Settings(BaseSettings):
     def model_post_init(self, __context):
         """初始化后验证，检查生产环境敏感设置"""
         if self.MODE == "production":
-            # 生产环境安全检查
             if self.JWT_SECRET_KEY == "change-this-secret-key-in-production":
                 import logging
                 logger = logging.getLogger(__name__)
                 logger.error(
                     "🚨 严重安全错误：生产环境使用了默认的 JWT_SECRET_KEY。"
-                    "必须设置环境变量 JWT_SECRET_KEY 为强随机密钥。"
                 )
                 raise ValueError(
                     "生产环境禁止使用默认 JWT_SECRET_KEY。"
-                    "请在环境变量中设置一个强随机密钥。"
                 )
-    
-    # CORS 配置
-    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "http://localhost:3000")
-    
+
+    # =========================
+    # 🟢 正确的 CORS 配置（核心修复）
+    # =========================
+
     @property
     def CORS_ORIGINS(self) -> List[str]:
-        """CORS 允许的来源"""
+        """CORS 允许的来源（开发 & 生产）"""
         if self.MODE == "development":
             return [
                 "http://localhost:3000",
@@ -68,15 +66,28 @@ class Settings(BaseSettings):
                 "http://localhost:3002",
                 "http://localhost:3003",
             ]
-        return [self.FRONTEND_URL]
-    
+
+        # 🟢 生产环境必须允许这三个域名
+        return [
+            "https://kabi.pro",
+            "https://www.kabi.pro",
+            "https://api.kabi.pro",
+        ]
+
+    # =========================
+    # 允许的 Host 配置
+    # =========================
     @property
     def ALLOWED_HOSTS(self) -> List[str]:
-        """允许的主机"""
         if self.MODE == "development":
             return ["*"]
-        return ["api.abc.com", "*.abc.com"]
-    
+        return [
+            "api.kabi.pro",
+            "*.kabi.pro",
+            "kabi.pro",
+            "www.kabi.pro"
+        ]
+
     # 日志配置
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     CLOUDWATCH_LOG_GROUP: str = os.getenv("CLOUDWATCH_LOG_GROUP", "knowledgehub-logs")
@@ -87,18 +98,16 @@ class Settings(BaseSettings):
         database_url = os.getenv("DATABASE_URL")
         if database_url:
             return database_url
-        # 如果没有设置 DATABASE_URL，使用 SQLite 作为默认值
         return "sqlite+aiosqlite:///./knowledgehub.db"
     
-    # Redis 配置（可选，用于缓存）
+    # Redis（可选）
     REDIS_URL: str = os.getenv("REDIS_URL", "")
-    
-    # 本地存储配置
+
+    # 本地文件存储
     LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", "./storage")
     
     @property
     def DATABASE_URL_SYNC(self) -> str:
-        """同步数据库 URL（用于 Alembic 迁移）"""
         url = self.DATABASE_URL
         if url.startswith("sqlite+aiosqlite"):
             return url.replace("sqlite+aiosqlite://", "sqlite://")
@@ -110,4 +119,3 @@ class Settings(BaseSettings):
 
 
 settings = Settings()
-
