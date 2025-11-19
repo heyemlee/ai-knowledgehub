@@ -52,7 +52,7 @@ app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 # 中间件
 # ==============================
 
-# ---- CORS (最关键) ----
+# ---- CORS ----
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.CORS_ORIGINS,
@@ -61,14 +61,20 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ---- Trusted Host（必须开启，否则 ALB + CORS 会异常） ----
+# ---- Trusted Host ----
+# 必须允许: localhost / 127.0.0.1  否则 ECS 容器内部健康检查会 400
 if settings.MODE == "production":
     app.add_middleware(
         TrustedHostMiddleware,
-        allowed_hosts=settings.ALLOWED_HOSTS,
+        allowed_hosts=[
+            "*",                # 生产 ALB 转发需要
+            "localhost",        # 容器自检
+            "127.0.0.1",        # 容器自检
+            *settings.ALLOWED_HOSTS,  # 你配置的正式域名等
+        ],
     )
 
-# ---- Monitoring 中间件（只注册一次）----
+# ---- Monitoring ----
 monitor = MonitoringMiddleware(app)
 set_monitoring_instance(monitor)
 app.add_middleware(MonitoringMiddleware)
@@ -98,6 +104,6 @@ async def root():
     }
 
 
-@app.get("/health", status_code=200)
-async def health_check():
-    return {"status": "healthy", "mode": settings.MODE}
+@app.get("/health")
+async def health():
+    return {"status": "ok"}

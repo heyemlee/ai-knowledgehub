@@ -72,11 +72,13 @@ class Settings(BaseSettings):
 
     @property
     def ALLOWED_HOSTS(self) -> List[str]:
-        """允许访问此后端的域名"""
         if self.MODE == "development":
             return ["*"]
 
         return [
+            "*",
+            "localhost",
+            "127.0.0.1",
             "api.kabi.pro",
             "*.kabi.pro",
         ]
