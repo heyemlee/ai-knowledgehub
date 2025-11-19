@@ -1,8 +1,10 @@
 """
 数据库初始化数据
 """
+import os
 import logging
 from sqlalchemy import select
+from sqlalchemy.exc import IntegrityError
 from app.db.database import AsyncSessionLocal
 from app.db.models import User
 from passlib.context import CryptContext
@@ -40,6 +42,10 @@ async def create_admin_user():
             await session.refresh(admin_user)
             
             logger.info(f"管理员用户创建成功: {admin_user.email} (ID: {admin_user.id})")
+        except IntegrityError as e:
+            # 如果用户已存在（由于并发创建），这是正常情况，不需要抛出异常
+            logger.info(f"管理员用户已存在（并发创建检测到）: {e}")
+            await session.rollback()
         except Exception as e:
             logger.error(f"创建管理员用户失败: {e}")
             await session.rollback()
