@@ -12,6 +12,7 @@ from app.api import (
     auth, chat, documents, conversations, token_usage, api_keys, admin
 )
 from app.db.database import init_db, close_db
+from app.db.init_data import create_admin_user
 from app.middleware.rate_limit import limiter, RateLimitExceeded
 from slowapi import _rate_limit_exceeded_handler
 from app.middleware.monitoring import MonitoringMiddleware, set_monitoring_instance
@@ -26,6 +27,7 @@ logger = logging.getLogger(__name__)
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     await init_db()
+    await create_admin_user()
     yield
     await close_db()
 
