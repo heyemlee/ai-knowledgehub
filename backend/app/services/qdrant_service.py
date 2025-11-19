@@ -194,19 +194,29 @@ class QdrantService:
     
     @qdrant_operation_retry
     def _search_points(self, query_embedding: List[float], limit: int, score_threshold: float = None):
-        """搜索点（带重试）"""
+        """搜索点（带重试 + ef_search 优化）"""
+        from qdrant_client.models import SearchParams
+        
+        # 使用优化的 HNSW 参数
+        search_params = SearchParams(
+            hnsw_ef=QdrantConfig.HNSW_EF_SEARCH,  # 128，提升精准度
+            exact=False  # 使用近似搜索（速度更快）
+        )
+        
         if score_threshold and score_threshold > 0:
             return self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_embedding,
                 limit=limit,
-                score_threshold=score_threshold
+                score_threshold=score_threshold,
+                search_params=search_params  # 添加搜索参数
             )
         else:
             return self.client.search(
                 collection_name=self.collection_name,
                 query_vector=query_embedding,
-                limit=limit
+                limit=limit,
+                search_params=search_params  # 添加搜索参数
             )
     
     def search(

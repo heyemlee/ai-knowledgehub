@@ -1,9 +1,10 @@
 from typing import List, Dict, Optional, AsyncGenerator, Tuple
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
-from app.core.constants import SearchConfig, ProcessingConfig
+from app.core.constants import SearchConfig, ProcessingConfig, RerankConfig
 import logging
 import time
+import asyncio
 
 logger = logging.getLogger(__name__)
 
@@ -112,6 +113,7 @@ class RAGService:
             metrics['error'] = str(e)
             raise
     
+    
     async def stream_query(
         self,
         question: str,
@@ -122,54 +124,133 @@ class RAGService:
         metrics = {
             'question_length': len(question),
             'embedding_time': 0,
+            'keyword_extraction_time': 0,
+            'parallel_time': 0,
             'retrieval_time': 0,
+            'rerank_time': 0,
             'generation_time': 0,
             'total_time': 0,
             'documents_retrieved': 0,
+            'documents_after_rerank': 0,
             'documents_used': 0,
             'token_usage': {}
         }
         
         try:
-            # 1. 生成问题向量嵌入
+            # 1. 并行执行：生成问题向量嵌入 + 提取关键词（优化：并行处理）
             logger.info(f"[RAG Stream] 开始处理问题: {question[:50]}...")
-            embed_start = time.time()
+            parallel_start = time.time()
             
-            embeddings, embedding_token_usage = self.openai_service.generate_embeddings([question])
+            # 创建并行任务
+            async def generate_embedding_task():
+                embed_start = time.time()
+                # 在异步环境中调用同步函数，使用 run_in_executor
+                loop = asyncio.get_event_loop()
+                embeddings, token_usage = await loop.run_in_executor(
+                    None, 
+                    self.openai_service.generate_embeddings, 
+                    [question]
+                )
+                embed_time = time.time() - embed_start
+                return embeddings, token_usage, embed_time
+            
+            async def extract_keywords_task():
+                keyword_start = time.time()
+                loop = asyncio.get_event_loop()
+                keywords, token_usage = await loop.run_in_executor(
+                    None,
+                    self.openai_service.extract_keywords,
+                    question
+                )
+                keyword_time = time.time() - keyword_start
+                return keywords, token_usage, keyword_time
+            
+            # 并行执行两个任务
+            (embeddings, embedding_token_usage, embed_time), \
+            (keywords, keyword_token_usage, keyword_time) = await asyncio.gather(
+                generate_embedding_task(),
+                extract_keywords_task()
+            )
+            
             question_embedding = embeddings[0] if embeddings else None
             
             if not question_embedding:
                 raise ValueError("生成问题向量失败")
             
-            metrics['embedding_time'] = time.time() - embed_start
+            metrics['parallel_time'] = time.time() - parallel_start
+            metrics['embedding_time'] = embed_time
+            metrics['keyword_extraction_time'] = keyword_time
+            
             if embedding_token_usage:
                 metrics['token_usage']['embedding'] = embedding_token_usage
+            if keyword_token_usage:
+                metrics['token_usage']['keyword_extraction'] = keyword_token_usage
             
-            # 2. 智能确定检索参数
-            retrieval_params = self._determine_retrieval_params(
-                question, limit, score_threshold
-            )
+            logger.info(f"[并行优化] Embedding: {embed_time:.3f}s, 关键词: {keyword_time:.3f}s, 总耗时: {metrics['parallel_time']:.3f}s（节省 {max(embed_time, keyword_time) - metrics['parallel_time']:.3f}s）")
             
-            # 3. 在 Qdrant 中检索相似文档
+            # 2. 智能确定检索参数（Rerank 模式：检索更多文档）
+            if RerankConfig.ENABLE_RERANK:
+                # 启用 Rerank 时，检索更多文档（10个）
+                retrieval_limit = RerankConfig.INITIAL_RETRIEVAL_LIMIT
+                final_limit = RerankConfig.FINAL_TOP_K
+            else:
+                # 未启用 Rerank 时，使用原有逻辑
+                retrieval_params = self._determine_retrieval_params(
+                    question, limit, score_threshold
+                )
+                retrieval_limit = retrieval_params['limit']
+                final_limit = retrieval_limit
+            
+            # 3. 在 Qdrant 中检索相似文档（优化：使用 ef_search=128）
             retrieval_start = time.time()
             
             relevant_docs = self.qdrant_service.search(
                 query_embedding=question_embedding,
-                limit=retrieval_params['limit'],
-                score_threshold=retrieval_params['score_threshold'],
+                limit=retrieval_limit,
+                score_threshold=score_threshold or SearchConfig.NORMAL_QUERY_THRESHOLD_SCORE,
                 query_text=question
             )
             
             metrics['retrieval_time'] = time.time() - retrieval_start
             metrics['documents_retrieved'] = len(relevant_docs)
             
+            logger.info(f"[检索完成] 使用 ef_search=128，检索到 {len(relevant_docs)} 个文档，耗时 {metrics['retrieval_time']:.3f}s")
+            
             # 4. 如果没有找到足够的文档，降级检索
-            if len(relevant_docs) < retrieval_params.get('min_docs', 1):
-                logger.warning(f"检索到的文档数量不足 ({len(relevant_docs)})，尝试降级检索")
+            if len(relevant_docs) < 1:
+                logger.warning(f"检索到的文档数量不足，尝试降级检索")
                 relevant_docs = self._fallback_retrieval(question_embedding, question)
                 metrics['used_fallback'] = True
             
-            # 5. 流式生成回答
+            # 5. Rerank：使用 GPT-4o-mini 重排序（优化：Rerank）
+            if RerankConfig.ENABLE_RERANK and len(relevant_docs) > 0:
+                rerank_start = time.time()
+                
+                loop = asyncio.get_event_loop()
+                reranked_docs, rerank_token_usage = await loop.run_in_executor(
+                    None,
+                    self.openai_service.rerank_documents,
+                    question,
+                    relevant_docs,
+                    final_limit
+                )
+                
+                metrics['rerank_time'] = time.time() - rerank_start
+                metrics['documents_after_rerank'] = len(reranked_docs)
+                
+                if rerank_token_usage:
+                    metrics['token_usage']['rerank'] = rerank_token_usage
+                
+                logger.info(f"[Rerank 完成] 从 {len(relevant_docs)} 个文档中选出 {len(reranked_docs)} 个，耗时 {metrics['rerank_time']:.3f}s")
+                
+                # 使用重排序后的文档
+                relevant_docs = reranked_docs
+            else:
+                # 未启用 Rerank，直接截取
+                relevant_docs = relevant_docs[:final_limit]
+                metrics['documents_after_rerank'] = len(relevant_docs)
+            
+            # 6. 流式生成回答
             generation_start = time.time()
             
             async for content, token_usage in self.openai_service.stream_answer(
@@ -193,18 +274,22 @@ class RAGService:
                     
                     # 计算总token使用量
                     total_tokens = 0
-                    if embedding_token_usage:
-                        total_tokens += embedding_token_usage.get('total_tokens', 0)
-                    if token_usage:
-                        total_tokens += token_usage.get('total_tokens', 0)
+                    for key in ['embedding', 'keyword_extraction', 'rerank', 'generation']:
+                        if key in metrics['token_usage']:
+                            total_tokens += metrics['token_usage'][key].get('total_tokens', 0)
                     metrics['token_usage']['total'] = total_tokens
                     
                     logger.info(
                         f"[RAG Stream] 完成查询处理: "
                         f"检索={metrics['documents_retrieved']}文档, "
+                        f"Rerank后={metrics['documents_after_rerank']}文档, "
                         f"使用={metrics['documents_used']}文档, "
                         f"tokens={total_tokens}, "
-                        f"耗时={metrics['total_time']:.2f}s"
+                        f"耗时={metrics['total_time']:.2f}s "
+                        f"(并行={metrics['parallel_time']:.2f}s, "
+                        f"检索={metrics['retrieval_time']:.2f}s, "
+                        f"Rerank={metrics.get('rerank_time', 0):.2f}s, "
+                        f"生成={metrics['generation_time']:.2f}s)"
                     )
                     
                     yield (None, sources, metrics)

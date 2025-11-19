@@ -3,7 +3,7 @@ OpenAI 服务封装
 """
 from openai import OpenAI
 from app.core.config import settings
-from app.core.constants import AIConfig, CacheConfig
+from app.core.constants import AIConfig, CacheConfig, RerankConfig
 from app.services.prompts import Prompts
 from app.services.cache_service import cache_service
 from app.utils.retry import openai_retry
@@ -220,6 +220,127 @@ class OpenAIService:
         except Exception as e:
             logger.warning(f"AI关键词提取失败，使用原问题: {e}")
             return [question.strip()], None
+    
+    @openai_retry
+    def _rerank_internal(self, system_prompt: str, user_prompt: str):
+        """
+        内部方法：调用 OpenAI API 进行文档重排序（带重试）
+        """
+        return self.client.chat.completions.create(
+            model=RerankConfig.RERANK_MODEL,
+            messages=[
+                {"role": "system", "content": system_prompt},
+                {"role": "user", "content": user_prompt}
+            ],
+            temperature=RerankConfig.RERANK_TEMPERATURE,
+            max_tokens=RerankConfig.RERANK_MAX_TOKENS
+        )
+    
+    def rerank_documents(
+        self, 
+        question: str, 
+        documents: List[Dict], 
+        top_k: int = RerankConfig.FINAL_TOP_K
+    ) -> Tuple[List[Dict], Optional[Dict]]:
+        """
+        使用 GPT-4o-mini 对检索到的文档进行重排序
+        
+        Args:
+            question: 用户问题
+            documents: 检索到的文档列表
+            top_k: 返回前 k 个文档
+            
+        Returns:
+            (重排序后的文档列表, token使用量字典) 元组
+        """
+        if not documents or len(documents) == 0:
+            logger.warning("没有文档需要重排序")
+            return [], None
+        
+        if not RerankConfig.ENABLE_RERANK:
+            logger.info("Rerank 功能未启用，返回原始文档")
+            return documents[:top_k], None
+        
+        try:
+            # 构建文档列表供 LLM 评分
+            doc_list = []
+            for i, doc in enumerate(documents):
+                content_preview = doc.get('content', '')[:300]  # 只取前300字符
+                metadata = doc.get('metadata', {})
+                filename = metadata.get('filename', '未知文档')
+                doc_list.append(f"[{i}] 来源: {filename}\n内容: {content_preview}...")
+            
+            docs_text = "\n\n".join(doc_list)
+            
+            # 检测语言
+            language = detect_language(question)
+            
+            if language == 'zh':
+                system_prompt = """你是一个文档相关性评估专家。根据用户问题，评估每个文档片段的相关性。
+请返回最相关的文档编号列表（按相关性从高到低排序）。
+只返回编号，用逗号分隔，例如：2,0,5,1,3"""
+                
+                user_prompt = f"""用户问题：{question}
+
+文档列表：
+{docs_text}
+
+请返回最相关的 {top_k} 个文档编号（按相关性从高到低），只返回编号，用逗号分隔："""
+            else:
+                system_prompt = """You are a document relevance assessment expert. Based on the user's question, evaluate the relevance of each document fragment.
+Return a list of the most relevant document numbers (sorted by relevance from high to low).
+Only return the numbers, separated by commas, e.g.: 2,0,5,1,3"""
+                
+                user_prompt = f"""User Question: {question}
+
+Document List:
+{docs_text}
+
+Please return the {top_k} most relevant document numbers (sorted by relevance from high to low), only return the numbers, separated by commas:"""
+            
+            # 调用 LLM
+            response = self._rerank_internal(system_prompt, user_prompt)
+            
+            # 解析结果
+            rerank_result = response.choices[0].message.content.strip()
+            logger.info(f"Rerank 结果: {rerank_result}")
+            
+            # 提取文档编号
+            try:
+                indices = [int(idx.strip()) for idx in rerank_result.split(',') if idx.strip().isdigit()]
+                indices = [idx for idx in indices if 0 <= idx < len(documents)]  # 过滤无效索引
+            except Exception as parse_error:
+                logger.warning(f"解析 Rerank 结果失败: {parse_error}，使用原始顺序")
+                indices = list(range(min(top_k, len(documents))))
+            
+            # 重排序文档
+            reranked_docs = []
+            for idx in indices[:top_k]:
+                doc = documents[idx].copy()
+                doc['rerank_position'] = len(reranked_docs) + 1  # 记录重排序后的位置
+                reranked_docs.append(doc)
+            
+            # 如果重排序结果不足 top_k，补充原始文档
+            if len(reranked_docs) < top_k:
+                for i, doc in enumerate(documents):
+                    if i not in indices and len(reranked_docs) < top_k:
+                        reranked_docs.append(doc)
+            
+            # Token 使用统计
+            token_usage = None
+            if hasattr(response, 'usage') and response.usage:
+                token_usage = {
+                    'prompt_tokens': response.usage.prompt_tokens,
+                    'completion_tokens': response.usage.completion_tokens,
+                    'total_tokens': response.usage.total_tokens
+                }
+            
+            logger.info(f"Rerank 完成: 从 {len(documents)} 个文档中选出 {len(reranked_docs)} 个")
+            return reranked_docs, token_usage
+            
+        except Exception as e:
+            logger.error(f"Rerank 失败: {e}，返回原始文档", exc_info=True)
+            return documents[:top_k], None
     
     @openai_retry
     def _generate_answer_internal(self, system_prompt: str, user_prompt: str, temperature: float, max_tokens: int):

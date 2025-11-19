@@ -34,7 +34,7 @@
         },
         {
           "name": "OPENAI_MODEL",
-          "value": "gpt-4-turbo-preview"
+          "value": "gpt-4o"
         },
         {
           "name": "OPENAI_EMBEDDING_MODEL",

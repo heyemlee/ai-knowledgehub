@@ -55,10 +55,23 @@ class AIConfig:
     DEFAULT_MAX_TOKENS = 1000
 
 
+class RerankConfig:
+    # Rerank 功能配置
+    ENABLE_RERANK = True  # 是否启用 Rerank
+    INITIAL_RETRIEVAL_LIMIT = 10  # 初始检索数量
+    FINAL_TOP_K = 3  # Rerank 后最终返回数量
+    RERANK_MODEL = "gpt-4o-mini"  # 使用的 Rerank 模型
+    RERANK_TEMPERATURE = 0.3  # Rerank 时的温度参数
+    RERANK_MAX_TOKENS = 500  # Rerank 响应的最大 token 数
+
+
 class QdrantConfig:
     # 默认检索配置
     DEFAULT_SEARCH_LIMIT = 5
     DEFAULT_SCORE_THRESHOLD = 0.6
+    
+    # HNSW 搜索参数优化
+    HNSW_EF_SEARCH = 128
     
     # 删除操作限制
     MAX_DELETE_POINTS = 10000
