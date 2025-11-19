@@ -2,18 +2,16 @@ name: Deploy knowledgehub-backend to AWS ECS
 
 on:
   push:
-    branches: [main] # 部署主分支
+    branches: [main]
 
 jobs:
   deploy:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 拉取 GitHub 源代码
       - name: Checkout source code
         uses: actions/checkout@v4
 
-      # 2️⃣ 配置 AWS 凭证
       - name: Configure AWS credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
@@ -21,12 +19,10 @@ jobs:
           aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
           aws-region: us-west-1
 
-      # 3️⃣ 登录 Amazon ECR
       - name: Login to Amazon ECR
         id: login-ecr
         uses: aws-actions/amazon-ecr-login@v2
 
-      # 4️⃣ 构建并推送镜像到 ECR
       - name: Build, tag, and push image to Amazon ECR
         env:
           ECR_REGISTRY: 463056910651.dkr.ecr.us-west-1.amazonaws.com
@@ -39,11 +35,10 @@ jobs:
           docker push $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG
           echo "✅ Image pushed successfully: $ECR_REGISTRY/$ECR_REPOSITORY:$IMAGE_TAG"
 
-      # 5️⃣ 强制 ECS 部署最新镜像
       - name: Force new ECS deployment
         env:
           CLUSTER_NAME: knowledgehub-cluster
-          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
+          SERVICE_NAME: knowledgehub-service
           AWS_REGION: us-west-1
         run: |
           echo "🔄 Triggering ECS deployment..."
@@ -54,11 +49,10 @@ jobs:
             --region $AWS_REGION
           echo "✅ ECS deployment triggered successfully."
 
-      # 6️⃣ 验证 ECS 服务状态
       - name: Verify ECS service status
         env:
           CLUSTER_NAME: knowledgehub-cluster
-          SERVICE_NAME: knowledgehub-task-service-4vffj6ar
+          SERVICE_NAME: knowledgehub-service   # ← 修正这里
           AWS_REGION: us-west-1
         run: |
           echo "🔍 Checking ECS service status..."
