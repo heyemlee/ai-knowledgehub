@@ -26,19 +26,19 @@ export default function LoginForm() {
       }
     } catch (err: any) {
       console.error('认证错误:', err)
-      
+
       let errorMessage = isRegister ? 'Registration failed, please check your information' : 'Login failed, please check email and password'
-      
+
       if (err.response?.data?.detail) {
         const detail = err.response.data.detail
-        
+
         if (Array.isArray(detail)) {
           errorMessage = detail.map((item: any) => {
             const field = item.loc?.[1] || 'field'
             const msg = item.msg || 'Validation failed'
             return `${field}: ${msg}`
           }).join(', ')
-        } 
+        }
         else if (typeof detail === 'string') {
           errorMessage = detail
         }
@@ -46,7 +46,7 @@ export default function LoginForm() {
           errorMessage = JSON.stringify(detail)
         }
       }
-      
+
       setError(errorMessage)
     } finally {
       setLoading(false)
@@ -76,11 +76,10 @@ export default function LoginForm() {
                 setIsRegister(false)
                 setError('')
               }}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                !isRegister
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${!isRegister
                   ? 'bg-white text-black shadow-sm'
                   : 'text-gray-500 hover:text-gray-900'
-              }`}
+                }`}
             >
               Login
             </button>
@@ -90,11 +89,10 @@ export default function LoginForm() {
                 setIsRegister(true)
                 setError('')
               }}
-              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${
-                isRegister
+              className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${isRegister
                   ? 'bg-white text-black shadow-sm'
                   : 'text-gray-500 hover:text-gray-900'
-              }`}
+                }`}
             >
               Register
             </button>

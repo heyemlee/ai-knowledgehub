@@ -83,13 +83,13 @@ async def register(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    用户注册（仅开发环境）
+    用户注册
     """
-    if settings.MODE == "production":
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="生产环境不支持注册"
-        )
+    # if settings.MODE == "production":
+    #     raise HTTPException(
+    #         status_code=status.HTTP_403_FORBIDDEN,
+    #         detail="生产环境不支持注册"
+    #     )
     
     existing_user = await get_user_by_email(db, user_data.email)
     if existing_user:
