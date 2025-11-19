@@ -98,6 +98,6 @@ async def root():
     }
 
 
-@app.get("/health", status_code=200)
-async def health_check():
-    return {"status": "healthy", "mode": settings.MODE}
+@app.get("/health")
+async def health():
+    return {"status": "ok"}
