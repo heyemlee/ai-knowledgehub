@@ -7,10 +7,21 @@ from pydantic_settings import BaseSettings
 from typing import List
 import os
 from dotenv import load_dotenv
+from pathlib import Path
 
-# 本地环境加载 .env
-if not os.getenv("AWS_EXECUTION_ENV") and os.getenv("MODE") != "production":
-    load_dotenv()
+# 自动定位项目根目录（即包含 frontend 和 backend 的目录）
+BASE_DIR = Path(__file__).resolve().parents[3]
+
+# .env 路径（根目录下）
+ENV_PATH = BASE_DIR / ".env"
+
+# 加载 .env
+if ENV_PATH.exists():
+    load_dotenv(ENV_PATH)
+
+# # 本地环境加载 .env
+# if not os.getenv("AWS_EXECUTION_ENV") and os.getenv("MODE") != "production":
+#     load_dotenv()
 
 
 class Settings(BaseSettings):
@@ -22,100 +33,90 @@ class Settings(BaseSettings):
     # API 配置
     API_PREFIX: str = os.getenv("API_PREFIX", "/api/v1")
     BACKEND_URL: str = os.getenv("BACKEND_URL", "http://localhost:8000")
-    
+
     # OpenAI 配置
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     OPENAI_MODEL: str = os.getenv("OPENAI_MODEL", "gpt-4-turbo-preview")
     OPENAI_EMBEDDING_MODEL: str = os.getenv("OPENAI_EMBEDDING_MODEL", "text-embedding-3-large")
-    
+
     # Qdrant 配置
     QDRANT_URL: str = os.getenv("QDRANT_URL", "")
     QDRANT_API_KEY: str = os.getenv("QDRANT_API_KEY", "")
     QDRANT_COLLECTION_NAME: str = os.getenv("QDRANT_COLLECTION_NAME", "knowledge_base")
-    
+
     # JWT 配置
     JWT_SECRET_KEY: str = os.getenv("JWT_SECRET_KEY", "change-this-secret-key-in-production")
     JWT_ALGORITHM: str = os.getenv("JWT_ALGORITHM", "HS256")
     JWT_EXPIRATION_HOURS: int = int(os.getenv("JWT_EXPIRATION_HOURS", "24"))
-    
-    def model_post_init(self, __context):
-        """初始化后验证，检查生产环境敏感设置"""
-        if self.MODE == "production":
-            if self.JWT_SECRET_KEY == "change-this-secret-key-in-production":
-                import logging
-                logger = logging.getLogger(__name__)
-                logger.error(
-                    "🚨 严重安全错误：生产环境使用了默认的 JWT_SECRET_KEY。"
-                )
-                raise ValueError(
-                    "生产环境禁止使用默认 JWT_SECRET_KEY。"
-                )
 
-    # =========================
-    # 🟢 正确的 CORS 配置（核心修复）
-    # =========================
+    # CORS 配置
+    FRONTEND_URL: str = os.getenv("FRONTEND_URL", "https://www.kabi.pro")
 
     @property
     def CORS_ORIGINS(self) -> List[str]:
-        """CORS 允许的来源（开发 & 生产）"""
+        """CORS 允许的来源"""
         if self.MODE == "development":
             return [
                 "http://localhost:3000",
                 "http://127.0.0.1:3000",
                 "http://localhost:3001",
                 "http://localhost:3002",
-                "http://localhost:3003",
             ]
 
-        # 🟢 生产环境必须允许这三个域名
+        # 生产允许的域名
         return [
             "https://kabi.pro",
             "https://www.kabi.pro",
             "https://api.kabi.pro",
         ]
 
-    # =========================
-    # 允许的 Host 配置
-    # =========================
     @property
     def ALLOWED_HOSTS(self) -> List[str]:
+        """允许访问此后端的域名"""
         if self.MODE == "development":
             return ["*"]
+
         return [
             "api.kabi.pro",
             "*.kabi.pro",
-            "kabi.pro",
-            "www.kabi.pro"
         ]
 
     # 日志配置
     LOG_LEVEL: str = os.getenv("LOG_LEVEL", "INFO")
     CLOUDWATCH_LOG_GROUP: str = os.getenv("CLOUDWATCH_LOG_GROUP", "knowledgehub-logs")
-    
-    # 数据库配置
-    @property
-    def DATABASE_URL(self) -> str:
-        database_url = os.getenv("DATABASE_URL")
-        if database_url:
-            return database_url
-        return "sqlite+aiosqlite:///./knowledgehub.db"
-    
+
+    # 数据库配置（必须是字段，不是 property！！！）
+    DATABASE_URL: str = os.getenv(
+        "DATABASE_URL",
+        "sqlite+aiosqlite:///./knowledgehub.db"
+    )
+
     # Redis（可选）
     REDIS_URL: str = os.getenv("REDIS_URL", "")
 
-    # 本地文件存储
+    # 本地文件存储路径
     LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", "./storage")
-    
+
     @property
     def DATABASE_URL_SYNC(self) -> str:
+        """同步版本数据库 URL（用于 Alembic）"""
         url = self.DATABASE_URL
         if url.startswith("sqlite+aiosqlite"):
             return url.replace("sqlite+aiosqlite://", "sqlite://")
         return url.replace("+aiosqlite", "").replace("+asyncpg", "")
-    
+
+    # 生产环境安全检查
+    def model_post_init(self, __context):
+        if self.MODE == "production":
+            if self.JWT_SECRET_KEY == "change-this-secret-key-in-production":
+                raise ValueError(
+                    "生产环境禁止使用默认 JWT_SECRET_KEY，请配置 Secrets Manager。"
+                )
+
     class Config:
         env_file = None
         case_sensitive = True
 
 
+# 全局 settings 实例
 settings = Settings()
