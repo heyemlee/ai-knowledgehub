@@ -103,6 +103,15 @@ class Settings(BaseSettings):
     # 本地文件存储路径
     LOCAL_STORAGE_PATH: str = os.getenv("LOCAL_STORAGE_PATH", "./storage")
 
+    # AWS S3 配置
+    AWS_ACCESS_KEY_ID: str = os.getenv("AWS_ACCESS_KEY_ID", "")
+    AWS_SECRET_ACCESS_KEY: str = os.getenv("AWS_SECRET_ACCESS_KEY", "")
+    AWS_REGION: str = os.getenv("AWS_REGION", "us-west-1")
+    S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "")
+    
+    # 存储类型: local | s3
+    STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
+
     @property
     def DATABASE_URL_SYNC(self) -> str:
         """同步版本数据库 URL（用于 Alembic）"""
