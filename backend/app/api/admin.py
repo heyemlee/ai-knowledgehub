@@ -198,6 +198,7 @@ async def admin_delete_document(
         from app.services.local_storage_service import storage_service
         from app.services.qdrant_service import qdrant_service
         
+        # 1. 查询文档是否存在
         result = await db.execute(
             select(Document).where(Document.file_id == file_id)
         )
@@ -206,12 +207,27 @@ async def admin_delete_document(
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
         
-        storage_service.delete_file(file_id, document.filename)
-        qdrant_service.delete_documents(file_id)
+        # 2. 删除物理文件
+        try:
+            storage_service.delete_file(file_id, document.filename)
+            logger.info(f"物理文件删除成功: {file_id}")
+        except Exception as e:
+            logger.error(f"物理文件删除失败: {e}")
+            # 继续执行，不阻断流程
+        
+        # 3. 删除向量数据
+        try:
+            qdrant_service.delete_documents(file_id)
+            logger.info(f"向量数据删除成功: {file_id}")
+        except Exception as e:
+            logger.error(f"向量数据删除失败: {e}")
+            # 继续执行，不阻断流程
+        
+        # 4. 删除数据库记录
         await db.delete(document)
         await db.commit()
         
-        logger.info(f"管理员 {current_admin.get('user_id')} 删除了文档 {file_id}")
+        logger.info(f"管理员 {current_admin.get('user_id')} 成功删除文档 {file_id}")
         return {"message": "文档删除成功", "file_id": file_id}
         
     except HTTPException:

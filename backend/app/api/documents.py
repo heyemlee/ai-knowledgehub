@@ -335,9 +335,11 @@ async def delete_document(
     current_user: dict = Depends(get_current_user),
     db: AsyncSession = Depends(get_db)
 ):
+    """删除文档（包括文件、向量数据和数据库记录）"""
     try:
         user_id = current_user.get("user_id")
         
+        # 1. 查询文档是否存在且属于当前用户
         result = await db.execute(
             select(Document).where(
                 Document.file_id == file_id,
@@ -349,16 +351,32 @@ async def delete_document(
         if not document:
             raise HTTPException(status_code=404, detail="文档不存在")
         
-        storage_service.delete_file(file_id, document.filename)
-        qdrant_service.delete_documents(file_id)
+        # 2. 删除物理文件
+        try:
+            storage_service.delete_file(file_id, document.filename)
+            logger.info(f"物理文件删除成功: {file_id}")
+        except Exception as e:
+            logger.error(f"物理文件删除失败: {e}")
+            # 继续执行，不阻断流程
         
-        db.delete(document)
+        # 3. 删除向量数据
+        try:
+            qdrant_service.delete_documents(file_id)
+            logger.info(f"向量数据删除成功: {file_id}")
+        except Exception as e:
+            logger.error(f"向量数据删除失败: {e}")
+            # 继续执行，不阻断流程
+        
+        # 4. 删除数据库记录
+        await db.delete(document)
         await db.commit()
         
+        logger.info(f"用户 {user_id} 成功删除文档 {file_id}")
         return {"message": "文档删除成功", "file_id": file_id}
+        
     except HTTPException:
         raise
     except Exception as e:
-        logger.error(f"文档删除失败: {e}")
+        logger.error(f"文档删除失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
