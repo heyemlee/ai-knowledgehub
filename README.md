@@ -37,6 +37,13 @@ JWT_SECRET_KEY=$(python scripts/generate_jwt_secret.py)
 MODE=development
 DATABASE_URL=sqlite+aiosqlite:///./knowledgehub.db  # 开发环境默认 SQLite
 FRONTEND_URL=http://localhost:3000
+
+# S3 存储配置（生产环境必需）
+STORAGE_TYPE=s3  # local 或 s3
+AWS_REGION=us-west-1
+S3_BUCKET_NAME=your-bucket-name
+AWS_ACCESS_KEY_ID=your-access-key  # 如果使用 IAM Role 可省略
+AWS_SECRET_ACCESS_KEY=your-secret-key  # 如果使用 IAM Role 可省略
 ```
 
 **生成 JWT Secret Key：**
@@ -203,7 +210,7 @@ reranked_docs = openai_service.rerank_documents(
 - **生产环境**：
   - **计算**：AWS ECS Fargate（Docker 容器）
   - **数据库**：AWS RDS PostgreSQL
-  - **文件存储**：AWS S3 / EFS
+  - **文件存储**：AWS S3（持久化存储）
   - **向量库**：Qdrant Cloud（独立部署）
   - **负载均衡**：AWS ALB
   - **配置管理**：AWS Secrets Manager
@@ -222,7 +229,7 @@ reranked_docs = openai_service.rerank_documents(
 ### AWS ECS 部署
 
 **前置准备**
-1. AWS 资源：ECS 集群、ECR 仓库、RDS PostgreSQL、ALB
+1. AWS 资源：ECS 集群、ECR 仓库、RDS PostgreSQL、ALB、S3 Bucket
 2. AWS Secrets Manager 配置：
    - `knowledgehub/database-url` - PostgreSQL 连接字符串
    - `knowledgehub/openai-api-key` - OpenAI API 密钥
@@ -230,6 +237,9 @@ reranked_docs = openai_service.rerank_documents(
    - `knowledgehub/qdrant-api-key` - Qdrant API 密钥
    - `knowledgehub/jwt-secret` - JWT 密钥
    - `knowledgehub/frontend-url` - Vercel 域名
+   - `knowledgehub/s3-bucket-name` - S3 Bucket 名称
+   - `knowledgehub/aws-access-key` - (可选) AWS Access Key
+   - `knowledgehub/aws-secret-key` - (可选) AWS Secret Key
 
 **GitHub Actions 自动部署**
 ```bash
