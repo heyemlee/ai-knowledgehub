@@ -64,15 +64,18 @@ class Settings(BaseSettings):
             ]
 
         # 生产允许的域名
-        env_origins = os.getenv("CORS_ORIGINS")
-        if env_origins:
-            return [origin.strip() for origin in env_origins.split(",")]
-
-        return [
+        origins = [
             "https://kabi.pro",
             "https://www.kabi.pro",
             "https://api.kabi.pro",
         ]
+        
+        env_origins = os.getenv("CORS_ORIGINS")
+        if env_origins:
+            extra_origins = [origin.strip() for origin in env_origins.split(",")]
+            origins.extend(extra_origins)
+
+        return list(set(origins))  # 去重
 
     @property
     def ALLOWED_HOSTS(self) -> List[str]:

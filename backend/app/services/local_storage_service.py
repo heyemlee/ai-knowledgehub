@@ -244,7 +244,14 @@ class S3StorageService(BaseStorageService):
 # 工厂方法
 def get_storage_service() -> BaseStorageService:
     if settings.STORAGE_TYPE == "s3":
-        return S3StorageService()
+        try:
+            return S3StorageService()
+        except Exception as e:
+            logger.error(f"S3 存储服务初始化失败，回退到本地存储: {e}")
+            # 这里可以选择回退，或者让它崩溃。为了排查 CORS 问题，先回退。
+            # 但生产环境如果必须用 S3，这可能会掩盖问题。
+            # 鉴于目前用户遇到 CORS 错误，应用存活优先。
+            return LocalStorageService()
     return LocalStorageService()
 
 # 全局实例
