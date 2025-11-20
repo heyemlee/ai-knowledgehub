@@ -74,14 +74,16 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     }
   }
 
-  const handleDownload = (documentId: string, filename: string) => {
+  const handleDownload = async (documentId: string, filename: string) => {
     try {
-      const url = documentsAPI.download(documentId)
+      const blob = await documentsAPI.downloadFile(documentId)
+      const url = window.URL.createObjectURL(blob)
       const a = document.createElement('a')
       a.href = url
       a.download = filename
       document.body.appendChild(a)
       a.click()
+      window.URL.revokeObjectURL(url)
       document.body.removeChild(a)
     } catch (error: any) {
       console.error('Download failed:', error)
@@ -192,31 +194,28 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
         <div className="flex border-b border-gray-200">
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'dashboard'
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'dashboard'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Dashboard
           </button>
           <button
             onClick={() => setActiveTab('documents')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'documents'
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'documents'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             Document Management
           </button>
           <button
             onClick={() => setActiveTab('users')}
-            className={`px-6 py-3 text-sm font-medium transition-colors ${
-              activeTab === 'users'
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'users'
                 ? 'text-blue-600 border-b-2 border-blue-600'
                 : 'text-gray-500 hover:text-gray-700'
-            }`}
+              }`}
           >
             User Management
           </button>
@@ -377,20 +376,18 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                             </td>
                             <td className="px-4 py-3 text-gray-600">{user.full_name || '-'}</td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                user.role === 'admin'
+                              <span className={`px-2 py-1 text-xs rounded-full ${user.role === 'admin'
                                   ? 'bg-purple-100 text-purple-800'
                                   : 'bg-gray-100 text-gray-800'
-                              }`}>
+                                }`}>
                                 {user.role === 'admin' ? 'Admin' : 'User'}
                               </span>
                             </td>
                             <td className="px-4 py-3">
-                              <span className={`px-2 py-1 text-xs rounded-full ${
-                                user.is_active
+                              <span className={`px-2 py-1 text-xs rounded-full ${user.is_active
                                   ? 'bg-green-100 text-green-800'
                                   : 'bg-red-100 text-red-800'
-                              }`}>
+                                }`}>
                                 {user.is_active ? 'Active' : 'Inactive'}
                               </span>
                             </td>

@@ -64,6 +64,10 @@ class Settings(BaseSettings):
             ]
 
         # 生产允许的域名
+        env_origins = os.getenv("CORS_ORIGINS")
+        if env_origins:
+            return [origin.strip() for origin in env_origins.split(",")]
+
         return [
             "https://kabi.pro",
             "https://www.kabi.pro",
