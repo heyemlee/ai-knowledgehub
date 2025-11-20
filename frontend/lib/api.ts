@@ -99,7 +99,7 @@ export const chatAPI = {
   stream: async function* (data: ChatRequest): AsyncGenerator<{ content: string; done: boolean; sources?: any[]; conversation_id?: string; error?: boolean }> {
     const token = localStorage.getItem('access_token')
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
-    
+
     const response = await fetch(`${API_URL}/api/v1/chat/stream`, {
       method: 'POST',
       headers: {
@@ -108,29 +108,29 @@ export const chatAPI = {
       },
       body: JSON.stringify(data),
     })
-    
+
     if (!response.ok) {
       throw new Error(`HTTP error! status: ${response.status}`)
     }
-    
+
     const reader = response.body?.getReader()
     const decoder = new TextDecoder()
-    
+
     if (!reader) {
       throw new Error('No reader available')
     }
-    
+
     let buffer = ''
-    
+
     while (true) {
       const { done, value } = await reader.read()
-      
+
       if (done) break
-      
+
       buffer += decoder.decode(value, { stream: true })
       const lines = buffer.split('\n')
       buffer = lines.pop() || ''
-      
+
       for (const line of lines) {
         if (line.startsWith('data: ')) {
           try {
@@ -145,7 +145,7 @@ export const chatAPI = {
         }
       }
     }
-    
+
     if (buffer.startsWith('data: ')) {
       try {
         const jsonStr = buffer.slice(6)
@@ -182,6 +182,12 @@ export const documentsAPI = {
   download: (fileId: string): string => {
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
     return `${API_URL}/api/v1/documents/${fileId}/download`
+  },
+  downloadFile: async (fileId: string): Promise<Blob> => {
+    const response = await apiClient.get(`/documents/${fileId}/download`, {
+      responseType: 'blob',
+    })
+    return response.data
   },
   delete: async (fileId: string) => {
     const response = await apiClient.delete(`/documents/${fileId}`)
