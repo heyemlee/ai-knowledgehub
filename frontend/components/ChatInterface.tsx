@@ -10,11 +10,11 @@ import UserProfile from './UserProfile'
 import AdminPanel from './AdminPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Send, LogOut, User, Settings } from 'lucide-react'
+import { Send, LogOut, User, Settings, Menu } from 'lucide-react'
 import { toast } from './Toast'
 
 export default function ChatInterface() {
-    const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
+  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
@@ -24,6 +24,7 @@ export default function ChatInterface() {
   const [refreshHistory, setRefreshHistory] = useState(0)
   const [showProfile, setShowProfile] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { logout, user } = useAuthStore()
   const router = useRouter()
@@ -148,21 +149,29 @@ export default function ChatInterface() {
   }
 
   return (
-    <div className="flex h-screen bg-white">
+    <div className="fixed inset-0 flex bg-white overflow-hidden">
       {/* 对话历史侧边栏 */}
       <ConversationHistory
         currentConversationId={conversationId}
         onSelectConversation={handleSelectConversation}
         onNewConversation={handleNewConversation}
         refreshTrigger={refreshHistory}
+        isOpen={mobileMenuOpen}
+        onClose={() => setMobileMenuOpen(false)}
       />
 
       {/* 主聊天区域 */}
-      <div className="flex-1 flex flex-col">
+      <div className="flex-1 flex flex-col w-full">
         {/* Header */}
-        <header className="bg-white border-b border-gray-200 px-6 py-4 flex items-center justify-between">
+        <header className="bg-white border-b border-gray-200 px-4 md:px-6 py-3 md:py-4 flex items-center justify-between sticky top-0 z-10">
           <div className="flex items-center gap-3">
-            <h1 className="text-2xl font-bold text-black">ABC AI Hub</h1>
+            <button
+              onClick={() => setMobileMenuOpen(true)}
+              className="md:hidden p-2 -ml-2 text-gray-600 hover:bg-gray-100 rounded-lg"
+            >
+              <Menu size={24} />
+            </button>
+            <h1 className="text-xl md:text-2xl font-bold text-black">ABC AI Hub</h1>
           </div>
           <div className="flex items-center gap-2">
             {isAdmin() && (
@@ -191,10 +200,10 @@ export default function ChatInterface() {
         </header>
 
         {/* Messages */}
-        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-8 space-y-6">
+        <div className="flex-1 overflow-y-auto px-4 md:px-6 py-4 md:py-8 space-y-4 md:space-y-6">
           {messages.length === 0 && (
             <div className="flex items-center justify-center h-full">
-              <div className="text-center max-w-2xl mx-auto">
+              <div className="text-center max-w-2xl mx-auto w-full">
                 <div className="mb-8">
                   <div className="w-16 h-16 bg-black rounded-2xl flex items-center justify-center mx-auto mb-6">
                     <svg className="w-8 h-8 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -218,11 +227,10 @@ export default function ChatInterface() {
               className={`flex ${msg.role === 'user' ? 'justify-end' : 'justify-start'} message-slide-in`}
             >
               <div
-                className={`max-w-3xl rounded-2xl px-5 py-4 ${
-                  msg.role === 'user'
-                    ? 'bg-black text-white'
-                    : 'bg-gray-50 text-gray-900 border border-gray-100'
-                }`}
+                className={`max-w-3xl rounded-2xl ${msg.role === 'user'
+                  ? 'bg-black text-white px-3 py-2 md:px-5 md:py-4'
+                  : 'text-gray-900 px-0 py-0'
+                  }`}
               >
                 {msg.role === 'user' ? (
                   <p className="whitespace-pre-wrap leading-relaxed text-[15px]">{msg.content}</p>
@@ -237,7 +245,7 @@ export default function ChatInterface() {
 
           {streaming && !streamingContent && (
             <div className="flex justify-start message-slide-in">
-              <div className="max-w-3xl rounded-2xl px-5 py-4 bg-gray-50 border border-gray-100 flex items-center justify-center min-h-[60px]">
+              <div className="max-w-3xl rounded-2xl px-3 py-2 md:px-5 md:py-4 bg-gray-50 border border-gray-100 flex items-center justify-center min-h-[40px]">
                 <div className="w-3 h-3 bg-black rounded-full animate-pulse-scale"></div>
               </div>
             </div>
@@ -245,7 +253,7 @@ export default function ChatInterface() {
 
           {streaming && streamingContent && (
             <div className="flex justify-start message-slide-in">
-              <div className="max-w-3xl rounded-2xl px-5 py-4 bg-gray-50 text-gray-900 border border-gray-100">
+              <div className="max-w-3xl rounded-2xl px-0 py-0 text-gray-900">
                 <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-li:text-gray-900">
                   <ReactMarkdown remarkPlugins={[remarkGfm]}>{streamingContent}</ReactMarkdown>
                 </div>
@@ -262,7 +270,7 @@ export default function ChatInterface() {
         </div>
 
         {/* Input */}
-        <div className="border-t border-gray-200 bg-white p-4 md:p-6">
+        <div className="border-t border-gray-200 bg-white p-2 md:p-6 pb-[max(0.5rem,env(safe-area-inset-bottom))]">
           <div className="max-w-4xl mx-auto">
             <div className="relative">
               <textarea
@@ -271,17 +279,17 @@ export default function ChatInterface() {
                 onKeyDown={handleKeyPress}
                 placeholder="What do you want to know?"
                 disabled={streaming}
-                className="w-full px-5 py-4 pr-14 bg-white border border-gray-200 rounded-2xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400 resize-none"
+                className="w-full px-3 md:px-5 py-2 md:py-4 pr-10 md:pr-14 bg-white border border-gray-200 rounded-2xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400 resize-none text-base"
                 rows={1}
                 style={{
-                  minHeight: '56px',
+                  minHeight: '40px',
                   maxHeight: '200px',
                 }}
               />
               <button
                 onClick={handleSend}
                 disabled={!input.trim() || streaming}
-                className="absolute right-3 bottom-3 p-3 bg-black hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl transition-all hover:scale-105 disabled:hover:scale-100"
+                className="absolute right-2 bottom-2.5 md:right-3 md:bottom-3 p-2 md:p-3 bg-black hover:bg-gray-800 disabled:opacity-30 disabled:cursor-not-allowed text-white rounded-xl transition-all hover:scale-105 disabled:hover:scale-100"
               >
                 {streaming ? (
                   <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin" />
@@ -290,9 +298,7 @@ export default function ChatInterface() {
                 )}
               </button>
             </div>
-            <p className="text-xs text-gray-400 mt-3 text-center">
-              AI may make mistakes. Please verify important information.
-            </p>
+
           </div>
         </div>
       </div>
