@@ -3,16 +3,19 @@
 import { useEffect, useState } from 'react'
 import { adminApi, AdminDocument, AdminUser, DocumentStats, UserStats } from '@/lib/adminApi'
 import { documentsAPI } from '@/lib/api'
-import { X, Upload, Trash2, Users, FileText, Download } from 'lucide-react'
+import { X, Upload, Trash2, Users, FileText, Download, Image } from 'lucide-react'
 import { toast } from './Toast'
 import { confirm } from './ConfirmDialog'
+import ImageManagement from './ImageManagement'
+
 
 interface AdminPanelProps {
   isOpen: boolean
   onClose: () => void
 }
 
-type Tab = 'dashboard' | 'documents' | 'users'
+type Tab = 'dashboard' | 'documents' | 'images' | 'users'
+
 
 export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
@@ -195,8 +198,8 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           <button
             onClick={() => setActiveTab('dashboard')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'dashboard'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             Dashboard
@@ -204,17 +207,26 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           <button
             onClick={() => setActiveTab('documents')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'documents'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             Document Management
           </button>
           <button
+            onClick={() => setActiveTab('images')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'images'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            Image Management
+          </button>
+          <button
             onClick={() => setActiveTab('users')}
             className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'users'
-                ? 'text-blue-600 border-b-2 border-blue-600'
-                : 'text-gray-500 hover:text-gray-700'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
               }`}
           >
             User Management
@@ -352,6 +364,10 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                 </div>
               )}
 
+              {activeTab === 'images' && (
+                <ImageManagement isOpen={activeTab === 'images'} />
+              )}
+
               {activeTab === 'users' && (
                 <div>
                   <div className="mb-6">
@@ -377,16 +393,16 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                             <td className="px-4 py-3 text-gray-600">{user.full_name || '-'}</td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 text-xs rounded-full ${user.role === 'admin'
-                                  ? 'bg-purple-100 text-purple-800'
-                                  : 'bg-gray-100 text-gray-800'
+                                ? 'bg-purple-100 text-purple-800'
+                                : 'bg-gray-100 text-gray-800'
                                 }`}>
                                 {user.role === 'admin' ? 'Admin' : 'User'}
                               </span>
                             </td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 text-xs rounded-full ${user.is_active
-                                  ? 'bg-green-100 text-green-800'
-                                  : 'bg-red-100 text-red-800'
+                                ? 'bg-green-100 text-green-800'
+                                : 'bg-red-100 text-red-800'
                                 }`}>
                                 {user.is_active ? 'Active' : 'Inactive'}
                               </span>
