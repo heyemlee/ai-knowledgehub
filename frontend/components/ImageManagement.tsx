@@ -323,7 +323,7 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
                     <ImageIcon className="w-16 h-16 text-gray-400 mx-auto mb-4" />
                     <div className="text-gray-500">No images uploaded yet</div>
                     <div className="text-sm text-gray-400 mt-2">
-                        Click "Upload Image" to add your first image
+                        Click &quot;Upload Image&quot; to add your first image
                     </div>
                 </div>
             ) : (
