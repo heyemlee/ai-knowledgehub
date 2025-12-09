@@ -14,7 +14,12 @@ import { Send, LogOut, User, Settings, Menu } from 'lucide-react'
 import { toast } from './Toast'
 
 export default function ChatInterface() {
-  const [messages, setMessages] = useState<Array<{ role: 'user' | 'assistant'; content: string; sources?: any[] }>>([])
+  const [messages, setMessages] = useState<Array<{
+    role: 'user' | 'assistant';
+    content: string;
+    sources?: any[];
+    images?: any[];  // 新增：图片列表
+  }>>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
   const [streaming, setStreaming] = useState(false)
@@ -87,6 +92,7 @@ export default function ChatInterface() {
     try {
       let fullAnswer = ''
       let finalSources: any[] | undefined = undefined
+      let finalImages: any[] | undefined = undefined  // 新增：图片数据
       let finalConversationId: string | null = null
 
       for await (const chunk of chatAPI.stream({
@@ -108,6 +114,11 @@ export default function ChatInterface() {
           finalSources = chunk.sources
         }
 
+        // 新增：接收图片数据
+        if (chunk.images) {
+          finalImages = chunk.images
+        }
+
         if (chunk.conversation_id) {
           finalConversationId = chunk.conversation_id
           if (!conversationId) {
@@ -123,6 +134,7 @@ export default function ChatInterface() {
           role: 'assistant',
           content: fullAnswer,
           sources: finalSources,
+          images: finalImages,  // 新增：保存图片数据
         },
       ])
       setRefreshHistory((prev) => prev + 1)
@@ -235,9 +247,43 @@ export default function ChatInterface() {
                 {msg.role === 'user' ? (
                   <p className="whitespace-pre-wrap leading-relaxed text-[15px]">{msg.content}</p>
                 ) : (
-                  <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-li:text-gray-900">
-                    <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
-                  </div>
+                  <>
+                    <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-li:text-gray-900">
+                      <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
+                    </div>
+
+                    {/* 显示图片 */}
+                    {msg.images && msg.images.length > 0 && (
+                      <div className="mt-4 space-y-2">
+                        <p className="text-sm text-gray-600 font-medium">相关图片：</p>
+                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                          {msg.images.map((image: any, imgIdx: number) => {
+                            const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+                            const imageUrl = `${API_URL}/api/v1/images/${image.id}/file`
+                            const thumbnailUrl = image.thumbnail_path
+                              ? `${API_URL}/api/v1/images/${image.id}/file?thumbnail=true`
+                              : imageUrl
+
+                            return (
+                              <div key={imgIdx} className="group relative overflow-hidden rounded-lg border border-gray-200 hover:border-gray-300 transition-all">
+                                <img
+                                  src={thumbnailUrl}
+                                  alt={image.alt_text || image.description || '相关图片'}
+                                  className="w-full h-32 object-cover cursor-pointer group-hover:scale-105 transition-transform"
+                                  onClick={() => window.open(imageUrl, '_blank')}
+                                />
+                                {image.description && (
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    {image.description.slice(0, 50)}{image.description.length > 50 ? '...' : ''}
+                                  </div>
+                                )}
+                              </div>
+                            )
+                          })}
+                        </div>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

@@ -96,7 +96,14 @@ export const authAPI = {
 }
 
 export const chatAPI = {
-  stream: async function* (data: ChatRequest): AsyncGenerator<{ content: string; done: boolean; sources?: any[]; conversation_id?: string; error?: boolean }> {
+  stream: async function* (data: ChatRequest): AsyncGenerator<{
+    content: string;
+    done: boolean;
+    sources?: any[];
+    images?: any[];  // 新增：图片列表
+    conversation_id?: string;
+    error?: boolean
+  }> {
     const token = localStorage.getItem('access_token')
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
 

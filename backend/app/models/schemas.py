@@ -174,3 +174,103 @@ class MessageResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ==============================
+# 图片相关 Schemas
+# ==============================
+
+class ImageTagCreate(BaseModel):
+    """创建图片标签请求"""
+    name: str = Field(..., min_length=1, max_length=100)
+    
+    @field_validator('name')
+    @classmethod
+    def validate_name(cls, v):
+        """验证并清理标签名"""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("标签名不能为空")
+        return v.strip()
+
+
+class ImageTagResponse(BaseModel):
+    """图片标签响应"""
+    id: int
+    name: str
+    created_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageUploadResponse(BaseModel):
+    """图片上传响应"""
+    file_id: str
+    filename: str
+    original_filename: str
+    file_size: int
+    mime_type: str
+    storage_path: str
+    thumbnail_path: Optional[str] = None
+    upload_time: datetime
+
+
+class ImageUpdate(BaseModel):
+    """图片更新请求"""
+    description: Optional[str] = Field(None, max_length=2000)
+    alt_text: Optional[str] = Field(None, max_length=500)
+    tag_ids: Optional[List[int]] = None
+    
+    @field_validator('description')
+    @classmethod
+    def validate_description(cls, v):
+        """验证描述"""
+        if v is None:
+            return None
+        return v.strip()
+    
+    @field_validator('alt_text')
+    @classmethod
+    def validate_alt_text(cls, v):
+        """验证替代文本"""
+        if v is None:
+            return None
+        return v.strip()
+
+
+class ImageResponse(BaseModel):
+    """图片详情响应"""
+    id: int
+    file_id: str
+    filename: str
+    original_filename: str
+    file_size: int
+    mime_type: str
+    storage_path: str
+    thumbnail_path: Optional[str] = None
+    description: Optional[str] = None
+    alt_text: Optional[str] = None
+    user_id: int
+    tags: List[ImageTagResponse] = []
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
+
+
+class ImageListResponse(BaseModel):
+    """图片列表响应"""
+    images: List[ImageResponse]
+    total: int
+    page: int
+    page_size: int
+
+
+class ChatResponseWithImages(BaseModel):
+    """问答响应（包含图片）"""
+    answer: str
+    sources: List[dict] = []
+    images: List[ImageResponse] = []  # 新增：相关图片列表
+    conversation_id: str
+    tokens_used: Optional[int] = None
+
