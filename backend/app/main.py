@@ -9,7 +9,7 @@ from fastapi.responses import JSONResponse
 from contextlib import asynccontextmanager
 from app.core.config import settings
 from app.api import (
-    auth, chat, documents, conversations, token_usage, api_keys, admin
+    auth, chat, documents, conversations, token_usage, api_keys, admin, images
 )
 from app.db.database import init_db, close_db
 from app.db.init_data import create_admin_user
@@ -90,6 +90,8 @@ app.include_router(conversations.router, prefix="/api/v1/conversations", tags=["
 app.include_router(token_usage.router, prefix="/api/v1/token-usage", tags=["Token 使用量"])
 app.include_router(api_keys.router, prefix="/api/v1/api-keys", tags=["API Key 管理"])
 app.include_router(admin.router, prefix="/api/v1/admin", tags=["管理员"])
+app.include_router(images.router, prefix="/api/v1/images", tags=["图片管理"])
+
 
 
 # ==============================

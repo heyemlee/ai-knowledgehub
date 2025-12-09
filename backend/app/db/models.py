@@ -1,11 +1,20 @@
 """
 数据库模型定义
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Table
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
 from datetime import datetime
+
+
+# 图片-标签关联表（多对多）
+image_tag_association = Table(
+    'image_tag_associations',
+    Base.metadata,
+    Column('image_id', Integer, ForeignKey('images.id', ondelete='CASCADE'), primary_key=True),
+    Column('tag_id', Integer, ForeignKey('image_tags.id', ondelete='CASCADE'), primary_key=True)
+)
 
 
 class User(Base):
@@ -87,4 +96,39 @@ class TokenUsage(Base):
     
     # 关系（可选，用于级联删除）
     user = relationship("User", backref="token_usage_records")
+
+
+class ImageTag(Base):
+    """图片标签模型"""
+    __tablename__ = "image_tags"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String(100), unique=True, nullable=False, index=True)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    
+    # 多对多关系
+    images = relationship("Image", secondary=image_tag_association, back_populates="tags")
+
+
+class Image(Base):
+    """图片模型"""
+    __tablename__ = "images"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    file_id = Column(String(255), unique=True, index=True, nullable=False)  # 唯一文件标识
+    filename = Column(String(255), nullable=False)  # 存储文件名
+    original_filename = Column(String(255), nullable=False)  # 原始文件名
+    file_size = Column(Integer, nullable=False)  # 文件大小（字节）
+    mime_type = Column(String(100), nullable=False)  # MIME 类型（image/jpeg, image/png 等）
+    storage_path = Column(String(500), nullable=False)  # 存储路径
+    thumbnail_path = Column(String(500), nullable=True)  # 缩略图路径（可选）
+    description = Column(Text, nullable=True)  # 图片描述（用于检索）
+    alt_text = Column(String(500), nullable=True)  # 替代文本（用于无障碍和检索）
+    user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # 关系
+    owner = relationship("User", backref="images")
+    tags = relationship("ImageTag", secondary=image_tag_association, back_populates="images")
 

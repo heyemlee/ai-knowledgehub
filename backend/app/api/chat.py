@@ -10,6 +10,7 @@ from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
 from app.services.token_usage_service import token_usage_service
 from app.services.cleanup_service import cleanup_old_conversations_for_user
+from app.services.image_retrieval_service import image_retrieval_service
 from app.middleware.rate_limit import limiter
 from app.core.constants import RateLimitConfig, TokenLimitConfig, SearchConfig, ProcessingConfig
 from app.core.config import settings
@@ -17,6 +18,7 @@ from typing import List
 import logging
 import uuid
 import json
+
 
 logger = logging.getLogger(__name__)
 router = APIRouter()
@@ -133,10 +135,11 @@ async def stream_answer(
         
         full_answer = ""
         sources = []
+        images = []  # 新增：相关图片列表
         token_usage = None
         
         async def generate():
-            nonlocal full_answer, token_usage
+            nonlocal full_answer, token_usage, images
             
             if not relevant_docs:
                 # 根据用户语言返回对应提示
@@ -192,7 +195,20 @@ async def stream_answer(
                         "metadata": metadata
                     })
             
-            yield f"data: {json.dumps({'content': '', 'done': True, 'sources': sources, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
+            # 检索相关图片
+            try:
+                images = await image_retrieval_service.search_images(
+                    db=db,
+                    question=chat_request.question,
+                    limit=3
+                )
+                logger.info(f"检索到 {len(images)} 张相关图片")
+            except Exception as e:
+                logger.warning(f"图片检索失败: {e}")
+                images = []
+            
+            yield f"data: {json.dumps({'content': '', 'done': True, 'sources': sources, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
+
             
             if user_id and conversation and full_answer:
                 try:
