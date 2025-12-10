@@ -145,3 +145,17 @@ async def get_current_user_info(
         created_at=user.created_at
     )
 
+
+async def get_current_admin_user(current_user: dict = Depends(get_current_user)):
+    """
+    检查当前用户是否是管理员
+    """
+    user_role = current_user.get("role")
+    
+    if user_role != "admin":
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="需要管理员权限"
+        )
+    
+    return current_user
