@@ -191,12 +191,17 @@ async def upload_image(
 ):
     """上传图片（仅管理员）"""
     try:
+        logger.info(f"开始上传图片: {file.filename}, content_type: {file.content_type}")
+        logger.info(f"用户信息: {current_user}")
+        
         # 验证文件
         validate_image_file(file)
+        logger.info("文件验证通过")
         
         # 读取文件内容
         file_content = await file.read()
         file_size = len(file_content)
+        logger.info(f"文件大小: {file_size} bytes")
         
         # 检查文件大小
         if file_size > MAX_IMAGE_SIZE:
@@ -209,6 +214,7 @@ async def upload_image(
         file_id = str(uuid.uuid4())
         file_ext = os.path.splitext(file.filename)[1].lower()
         stored_filename = f"{file_id}{file_ext}"
+        logger.info(f"生成文件ID: {file_id}, 存储文件名: {stored_filename}")
         
         # 保存原图
         storage_path = await storage_service.save_file(
@@ -216,6 +222,7 @@ async def upload_image(
             stored_filename,
             file.content_type
         )
+        logger.info(f"原图保存成功: {storage_path}")
         
         # 创建缩略图
         thumbnail_path = None
@@ -227,12 +234,14 @@ async def upload_image(
                 thumbnail_filename,
                 "image/jpeg"
             )
+            logger.info(f"缩略图保存成功: {thumbnail_path}")
         
         # 解析标签 ID
         tag_id_list = []
         if tag_ids:
             try:
                 tag_id_list = [int(tid.strip()) for tid in tag_ids.split(",") if tid.strip()]
+                logger.info(f"解析标签ID: {tag_id_list}")
             except ValueError:
                 raise HTTPException(
                     status_code=status.HTTP_400_BAD_REQUEST,
@@ -240,6 +249,9 @@ async def upload_image(
                 )
         
         # 创建数据库记录
+        user_id = current_user.get("user_id")
+        logger.info(f"创建数据库记录, user_id: {user_id}")
+        
         new_image = Image(
             file_id=file_id,
             filename=stored_filename,
@@ -250,11 +262,12 @@ async def upload_image(
             thumbnail_path=thumbnail_path,
             description=description,
             alt_text=alt_text,
-            user_id=current_user.get("user_id")
+            user_id=user_id
         )
         
         db.add(new_image)
         await db.flush()  # 获取 ID
+        logger.info(f"数据库记录创建成功, image_id: {new_image.id}")
         
         # 关联标签
         if tag_id_list:
@@ -271,11 +284,13 @@ async def upload_image(
             
             # 添加关联
             new_image.tags = tags
+            logger.info(f"标签关联成功: {len(tags)} 个标签")
         
         await db.commit()
         await db.refresh(new_image)
+        logger.info("数据库提交成功")
         
-        return ImageUploadResponse(
+        response_data = ImageUploadResponse(
             file_id=new_image.file_id,
             filename=new_image.filename,
             original_filename=new_image.original_filename,
@@ -285,6 +300,8 @@ async def upload_image(
             thumbnail_path=new_image.thumbnail_path,
             upload_time=new_image.created_at
         )
+        logger.info(f"响应数据构建成功: {response_data.dict()}")
+        return response_data
         
     except HTTPException:
         raise
