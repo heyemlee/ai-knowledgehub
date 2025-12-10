@@ -59,6 +59,10 @@
         {
           "name": "CLOUDWATCH_LOG_GROUP",
           "value": "knowledgehub-logs"
+        },
+        {
+          "name": "STORAGE_TYPE",
+          "value": "s3"
         }
       ],
       "secrets": [

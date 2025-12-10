@@ -113,7 +113,7 @@ class Settings(BaseSettings):
     S3_BUCKET_NAME: str = os.getenv("S3_BUCKET_NAME", "")
     
     # 存储类型: local | s3
-    STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "local")
+    STORAGE_TYPE: str = os.getenv("STORAGE_TYPE", "s3" if os.getenv("MODE") == "production" else "local")
 
     @property
     def DATABASE_URL_SYNC(self) -> str:

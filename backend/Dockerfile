@@ -31,6 +31,7 @@ COPY --from=builder /root/.local /home/appuser/.local
 ENV PATH=/home/appuser/.local/bin:$PATH
 
 # ---- 复制项目文件 ----
+RUN mkdir -p /app/storage && chown -R appuser:appuser /app/storage
 COPY --chown=appuser:appuser app ./app
 
 USER appuser
