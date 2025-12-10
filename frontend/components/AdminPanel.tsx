@@ -104,7 +104,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     if (!confirmed) return
 
     try {
-      await documentsAPI.delete(documentId)
+      await adminApi.deleteDocument(documentId)
       toast.success('Delete successful')
       await loadDocuments()
     } catch (error: any) {

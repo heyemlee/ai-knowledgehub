@@ -293,7 +293,7 @@ async def upload_image(
         logger.error(f"上传图片失败: {e}", exc_info=True)
         raise HTTPException(
             status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
-            detail="上传图片失败"
+            detail=f"上传图片失败: {str(e)}"
         )
 
 

@@ -120,11 +120,7 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
                 formData.append('tag_ids', selectedTags.join(','))
             }
 
-            await apiClient.post('/images/upload', formData, {
-                headers: {
-                    'Content-Type': 'multipart/form-data',
-                },
-            })
+            await apiClient.post('/images/upload', formData)
 
             toast.success('Image uploaded successfully!')
             setSelectedImage(null)
