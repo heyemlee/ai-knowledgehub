@@ -4,6 +4,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy import select
 from app.models.schemas import ChatRequest
 from app.utils.auth import get_current_user
+from app.utils.language_detector import detect_language
 from app.db.database import get_db
 from app.db.models import Conversation, Message
 from app.services.openai_service import openai_service
@@ -12,7 +13,7 @@ from app.services.token_usage_service import token_usage_service
 from app.services.cleanup_service import cleanup_old_conversations_for_user
 from app.services.image_retrieval_service import image_retrieval_service
 from app.middleware.rate_limit import limiter
-from app.core.constants import RateLimitConfig, TokenLimitConfig, SearchConfig, ProcessingConfig
+from app.core.constants import RateLimitConfig, TokenLimitConfig, SearchConfig, ProcessingConfig, ConversationConfig
 from app.core.config import settings
 from typing import List
 import logging
@@ -155,13 +156,16 @@ async def stream_answer(
                     logger.warning(f"图片检索失败: {e}")
                     images = []
                 
-                # 根据用户语言返回对应提示
-                if chat_request.locale == 'en-US':
+                # 自动检测问题语言，返回对应语言的提示
+                question_language = detect_language(chat_request.question)
+                logger.info(f"检测到问题语言: {question_language}")
+                
+                if question_language == 'en':
                     if images:
                         error_msg = "No relevant documents found in the knowledge base, but here are some related images:"
                     else:
                         error_msg = "Sorry, no relevant information found in the knowledge base. Please upload relevant documents first."
-                else:
+                else:  # zh
                     if images:
                         error_msg = "知识库中没有找到相关文档，但找到了一些相关图片："
                     else:
@@ -244,6 +248,30 @@ async def stream_answer(
                         conversation.title = chat_request.question[:50]
                     
                     await db.commit()
+                    
+                    # 清理当前对话中过多的消息
+                    if ConversationConfig.ENABLE_MESSAGE_LIMIT:
+                        try:
+                            # 获取当前对话的所有消息，按时间降序
+                            messages_result = await db.execute(
+                                select(Message)
+                                .where(Message.conversation_id == conversation.id)
+                                .order_by(Message.created_at.desc())
+                            )
+                            all_messages = messages_result.scalars().all()
+                            
+                            # 如果消息数量超过限制，删除最旧的消息
+                            if len(all_messages) > ConversationConfig.MAX_MESSAGES_PER_CONVERSATION:
+                                messages_to_delete = all_messages[ConversationConfig.MAX_MESSAGES_PER_CONVERSATION:]
+                                
+                                for msg in messages_to_delete:
+                                    await db.delete(msg)
+                                
+                                await db.commit()
+                                logger.info(f"对话 {conversation.conversation_id} 自动清理了 {len(messages_to_delete)} 条旧消息")
+                        except Exception as cleanup_error:
+                            logger.warning(f"清理对话消息失败: {cleanup_error}")
+                            # 清理失败不影响主流程
                     
                     # 清理用户超过最大数量的旧对话（只保留最近10个）
                     # 在保存完消息后清理，确保新对话已经保存

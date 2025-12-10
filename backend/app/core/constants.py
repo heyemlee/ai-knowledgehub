@@ -179,6 +179,7 @@ class CacheConfig:
     ANSWER_CACHE_PREFIX = "answer"
 
 
+
 class ImageConfig:
     """图片处理配置"""
     
@@ -197,3 +198,18 @@ class ImageConfig:
     # 是否启用智能缩略图（False = 总是生成缩略图）
     ENABLE_SMART_THUMBNAIL = True
 
+
+class ConversationConfig:
+    """对话管理配置"""
+    
+    # 每个用户最多保留的对话数量
+    MAX_CONVERSATIONS_PER_USER = 10
+    
+    # 是否启用自动清理（False = 不自动删除旧对话）
+    ENABLE_AUTO_CLEANUP = True
+    
+    # 每个对话最多保留的消息数量（包括用户和AI的消息）
+    MAX_MESSAGES_PER_CONVERSATION = 50
+    
+    # 是否启用消息数量限制
+    ENABLE_MESSAGE_LIMIT = True
