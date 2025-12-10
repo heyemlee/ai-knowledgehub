@@ -177,3 +177,23 @@ class CacheConfig:
     EMBEDDING_CACHE_PREFIX = "embedding"
     SEARCH_CACHE_PREFIX = "search"
     ANSWER_CACHE_PREFIX = "answer"
+
+
+class ImageConfig:
+    """图片处理配置"""
+    
+    # 缩略图尺寸（宽, 高）
+    THUMBNAIL_MAX_SIZE = (300, 300)
+    
+    # 智能缩略图生成阈值
+    # 只有当原图满足以下条件时才生成缩略图：
+    # 1. 尺寸大于缩略图尺寸
+    # 2. 文件大小大于此阈值（KB）
+    THUMBNAIL_SIZE_THRESHOLD_KB = 200  # 200KB
+    
+    # 缩略图 JPEG 质量（1-100）
+    THUMBNAIL_JPEG_QUALITY = 85
+    
+    # 是否启用智能缩略图（False = 总是生成缩略图）
+    ENABLE_SMART_THUMBNAIL = True
+

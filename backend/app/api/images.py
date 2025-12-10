@@ -17,6 +17,7 @@ from app.services.image_storage_service import storage_service
 
 from app.middleware.rate_limit import limiter
 from fastapi import Request
+from app.core.constants import ImageConfig
 import uuid
 import logging
 from datetime import datetime
@@ -58,21 +59,66 @@ def validate_image_file(file: UploadFile) -> None:
         )
 
 
-async def create_thumbnail(image_data: bytes, max_size: tuple = (300, 300)) -> bytes:
-    """创建缩略图"""
+
+def create_thumbnail(image_data: bytes, max_size: tuple = None) -> tuple[bytes, dict]:
+    """
+    创建缩略图（智能优化）
+    
+    返回: (thumbnail_data, info_dict)
+        - thumbnail_data: 缩略图字节数据，如果不需要生成则返回 None
+        - info_dict: 包含原图信息 {'width': int, 'height': int, 'needs_thumbnail': bool}
+    """
+    if max_size is None:
+        max_size = ImageConfig.THUMBNAIL_MAX_SIZE
+    
     try:
         img = PILImage.open(io.BytesIO(image_data))
+        original_width, original_height = img.size
+        
+        # 智能判断是否需要生成缩略图
+        file_size_kb = len(image_data) / 1024
+        
+        # 根据配置决定是否启用智能缩略图
+        if ImageConfig.ENABLE_SMART_THUMBNAIL:
+            # 智能模式：只为大图生成缩略图
+            # 1. 如果原图尺寸小于等于缩略图尺寸，不生成
+            # 2. 如果原图文件大小小于阈值，不生成
+            needs_thumbnail = (
+                original_width > max_size[0] or 
+                original_height > max_size[1]
+            ) and file_size_kb > ImageConfig.THUMBNAIL_SIZE_THRESHOLD_KB
+        else:
+            # 总是生成缩略图模式
+            needs_thumbnail = True
+        
+        info = {
+            'width': original_width,
+            'height': original_height,
+            'needs_thumbnail': needs_thumbnail,
+            'original_size_kb': round(file_size_kb, 2)
+        }
+        
+        if not needs_thumbnail:
+            logger.info(f"原图尺寸 {original_width}x{original_height}, 大小 {file_size_kb:.2f}KB, 无需生成缩略图")
+            return None, info
+        
+        # 生成缩略图
         img.thumbnail(max_size, PILImage.Resampling.LANCZOS)
         
         # 保存为 JPEG 格式
         output = io.BytesIO()
         if img.mode in ('RGBA', 'LA', 'P'):
             img = img.convert('RGB')
-        img.save(output, format='JPEG', quality=85)
-        return output.getvalue()
+        img.save(output, format='JPEG', quality=ImageConfig.THUMBNAIL_JPEG_QUALITY)
+        
+        thumbnail_size_kb = len(output.getvalue()) / 1024
+        logger.info(f"缩略图生成成功: {img.size[0]}x{img.size[1]}, 大小 {thumbnail_size_kb:.2f}KB (节省 {file_size_kb - thumbnail_size_kb:.2f}KB)")
+        
+        return output.getvalue(), info
     except Exception as e:
         logger.warning(f"创建缩略图失败: {e}")
-        return None
+        return None, {'width': 0, 'height': 0, 'needs_thumbnail': False, 'original_size_kb': 0}
+
 
 
 # ==============================
@@ -224,9 +270,10 @@ async def upload_image(
         )
         logger.info(f"原图保存成功: {storage_path}")
         
-        # 创建缩略图
+        # 创建缩略图（智能优化：只为大图生成）
         thumbnail_path = None
-        thumbnail_data = await create_thumbnail(file_content)
+        thumbnail_data, image_info = create_thumbnail(file_content)
+        
         if thumbnail_data:
             thumbnail_filename = f"{file_id}_thumb.jpg"
             thumbnail_path = await storage_service.save_file(
@@ -235,6 +282,8 @@ async def upload_image(
                 "image/jpeg"
             )
             logger.info(f"缩略图保存成功: {thumbnail_path}")
+        else:
+            logger.info(f"使用原图作为缩略图（原图: {image_info['width']}x{image_info['height']}, {image_info['original_size_kb']}KB）")
         
         # 解析标签 ID
         tag_id_list = []
