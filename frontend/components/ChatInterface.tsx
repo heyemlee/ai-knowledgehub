@@ -254,9 +254,9 @@ export default function ChatInterface() {
 
                     {/* 显示图片 */}
                     {msg.images && msg.images.length > 0 && (
-                      <div className="mt-4 space-y-2">
+                      <div className="mt-4 space-y-3">
                         <p className="text-sm text-gray-600 font-medium">相关图片：</p>
-                        <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                        <div className="flex flex-wrap gap-4">
                           {msg.images.map((image: any, imgIdx: number) => {
                             const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
                             const imageUrl = `${API_URL}/api/v1/images/${image.id}/file`
@@ -265,16 +265,17 @@ export default function ChatInterface() {
                               : imageUrl
 
                             return (
-                              <div key={imgIdx} className="group relative overflow-hidden rounded-lg border border-gray-200 hover:border-gray-300 transition-all">
+                              <div key={imgIdx} className="group relative rounded-lg border border-gray-200 hover:border-gray-400 transition-all overflow-hidden bg-gray-50">
                                 <img
-                                  src={thumbnailUrl}
-                                  alt={image.alt_text || image.description || '相关图片'}
-                                  className="w-full h-32 object-cover cursor-pointer group-hover:scale-105 transition-transform"
+                                  src={imageUrl}
+                                  alt={image.description || '相关图片'}
+                                  className="max-w-full max-h-96 object-contain cursor-pointer group-hover:opacity-90 transition-opacity"
                                   onClick={() => window.open(imageUrl, '_blank')}
+                                  loading="lazy"
                                 />
                                 {image.description && (
-                                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-xs p-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                                    {image.description.slice(0, 50)}{image.description.length > 50 ? '...' : ''}
+                                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent text-white text-xs p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <p className="line-clamp-2">{image.description}</p>
                                   </div>
                                 )}
                               </div>

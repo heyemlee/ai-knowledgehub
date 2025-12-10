@@ -619,8 +619,7 @@ async def get_image_file(
     request: Request,
     image_id: int,
     thumbnail: bool = Query(False),
-    db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_user)
+    db: AsyncSession = Depends(get_db)
 ):
     """获取图片文件"""
     try:
