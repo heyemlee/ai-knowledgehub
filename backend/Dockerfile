@@ -1,5 +1,5 @@
 # ---------- 构建阶段 ----------
-FROM python:3.11-slim as builder
+FROM python:3.11-slim AS builder
 
 WORKDIR /build
 
@@ -32,14 +32,9 @@ ENV PATH=/home/appuser/.local/bin:$PATH
 
 # ---- 复制项目文件 ----
 COPY --chown=appuser:appuser app ./app
-COPY --chown=appuser:appuser storage ./storage
-COPY --chown=appuser:appuser scripts ./scripts
-COPY --chown=appuser:appuser requirements.txt ./requirements.txt
-
-# ---- storage 权限 ----
-RUN chown -R appuser:appuser /app/storage
 
 USER appuser
+
 
 EXPOSE 8000
 
