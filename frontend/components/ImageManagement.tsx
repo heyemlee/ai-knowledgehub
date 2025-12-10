@@ -120,6 +120,7 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
                 formData.append('tag_ids', selectedTags.join(','))
             }
 
+            // 不要手动设置 Content-Type，让 axios 自动处理 FormData
             await apiClient.post('/images/upload', formData)
 
             toast.success('Image uploaded successfully!')
