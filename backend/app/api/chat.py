@@ -138,17 +138,37 @@ async def stream_answer(
         images = []  # 新增：相关图片列表
         token_usage = None
         
+        
         async def generate():
             nonlocal full_answer, token_usage, images
             
             if not relevant_docs:
+                # 即使没有文档，也尝试检索图片
+                try:
+                    images = await image_retrieval_service.search_images(
+                        db=db,
+                        question=chat_request.question,
+                        limit=3
+                    )
+                    logger.info(f"没有文档，但检索到 {len(images)} 张相关图片")
+                except Exception as e:
+                    logger.warning(f"图片检索失败: {e}")
+                    images = []
+                
                 # 根据用户语言返回对应提示
                 if chat_request.locale == 'en-US':
-                    error_msg = "Sorry, no relevant information found in the knowledge base. Please upload relevant documents first."
+                    if images:
+                        error_msg = "No relevant documents found in the knowledge base, but here are some related images:"
+                    else:
+                        error_msg = "Sorry, no relevant information found in the knowledge base. Please upload relevant documents first."
                 else:
-                    error_msg = "抱歉，知识库中没有找到相关信息。请先上传相关文档到知识库。"
+                    if images:
+                        error_msg = "知识库中没有找到相关文档，但找到了一些相关图片："
+                    else:
+                        error_msg = "抱歉，知识库中没有找到相关信息。请先上传相关文档到知识库。"
+                
                 full_answer = error_msg
-                yield f"data: {json.dumps({'content': error_msg, 'done': True}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'content': error_msg, 'done': True, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
                 return
             
             try:
