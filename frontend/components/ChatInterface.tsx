@@ -260,12 +260,10 @@ export default function ChatInterface() {
                           {msg.images.map((image: any, imgIdx: number) => {
                             const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
                             const imageUrl = `${API_URL}/api/v1/images/${image.id}/file`
-                            const thumbnailUrl = image.thumbnail_path
-                              ? `${API_URL}/api/v1/images/${image.id}/file?thumbnail=true`
-                              : imageUrl
 
                             return (
                               <div key={imgIdx} className="group relative rounded-lg border border-gray-200 hover:border-gray-400 transition-all overflow-hidden bg-gray-50">
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={imageUrl}
                                   alt={image.description || '相关图片'}
