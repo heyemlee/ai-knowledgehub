@@ -187,7 +187,7 @@ async def upload_image(
     alt_text: Optional[str] = Form(None),
     tag_ids: Optional[str] = Form(None),  # 逗号分隔的标签 ID
     db: AsyncSession = Depends(get_db),
-    current_user: User = Depends(get_current_admin_user)
+    current_user: dict = Depends(get_current_admin_user)
 ):
     """上传图片（仅管理员）"""
     try:
@@ -250,7 +250,7 @@ async def upload_image(
             thumbnail_path=thumbnail_path,
             description=description,
             alt_text=alt_text,
-            user_id=current_user.id
+            user_id=current_user.get("user_id")
         )
         
         db.add(new_image)
