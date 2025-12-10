@@ -1,11 +1,14 @@
 # 多阶段构建：构建阶段
 FROM python:3.11-slim as builder
 
-WORKDIR /app
+WORKDIR /build
 
-# 安装构建依赖
+# 安装构建依赖（包含 Pillow 所需的图像库）
 RUN apt-get update && apt-get install -y \
     gcc \
+    libjpeg-dev \
+    zlib1g-dev \
+    libpng-dev \
     && rm -rf /var/lib/apt/lists/*
 
 # 复制依赖文件
@@ -28,14 +31,14 @@ RUN apt-get update && apt-get install -y \
 # 创建非 root 用户
 RUN useradd -m -u 1000 appuser
 
-# 从构建阶段复制 Python 依赖到 appuser 目录
+# 从构建阶段复制 Python 依赖
 COPY --from=builder /root/.local /home/appuser/.local
 
 # 设置 PATH 环境变量
 ENV PATH=/home/appuser/.local/bin:$PATH
 
-# 复制应用代码
-COPY --chown=appuser:appuser . .
+# 只复制 app 目录（核心修复！）
+COPY --chown=appuser:appuser app ./app
 
 # 切换到非 root 用户
 USER appuser
@@ -53,8 +56,6 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=60s --retries=3 \
     CMD curl -f http://localhost:8000/health || exit 1
 
 # 使用 Gunicorn + Uvicorn workers 启动（生产模式）
-# workers 数量根据 CPU 核心数自动调整，建议设置为 (2 * CPU核心数) + 1
-# 对于 Fargate 0.5 vCPU，使用 2 workers；对于 1 vCPU，使用 4 workers
 CMD gunicorn app.main:app \
     --workers 2 \
     --worker-class uvicorn.workers.UvicornWorker \
@@ -65,4 +66,3 @@ CMD gunicorn app.main:app \
     --error-logfile - \
     --log-level info \
     --capture-output
-
