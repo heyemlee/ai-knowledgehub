@@ -13,7 +13,7 @@ from app.models.schemas import (
     ImageTagCreate, ImageTagResponse, ImageListResponse
 )
 from app.api.auth import get_current_user, get_current_admin_user
-from app.services.local_storage_service import storage_service
+from app.services.image_storage_service import storage_service
 
 from app.middleware.rate_limit import limiter
 from fastapi import Request
