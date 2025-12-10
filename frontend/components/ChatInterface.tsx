@@ -255,7 +255,7 @@ export default function ChatInterface() {
                     {/* 显示图片 */}
                     {msg.images && msg.images.length > 0 && (
                       <div className="mt-4 space-y-3">
-                        <p className="text-sm text-gray-600 font-medium">相关图片：</p>
+                        <p className="text-sm text-gray-600 font-medium">Related Images:</p>
                         <div className="flex flex-wrap gap-4">
                           {msg.images.map((image: any, imgIdx: number) => {
                             const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -266,7 +266,7 @@ export default function ChatInterface() {
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={imageUrl}
-                                  alt={image.description || '相关图片'}
+                                  alt={image.description || 'Related Image'}
                                   className="max-w-full max-h-96 object-contain cursor-pointer group-hover:opacity-90 transition-opacity"
                                   onClick={() => window.open(imageUrl, '_blank')}
                                   loading="lazy"

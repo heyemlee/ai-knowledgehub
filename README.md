@@ -1,60 +1,59 @@
 # AI Knowledge Hub
 
-AI 知识库系统，基于 RAG（检索增强生成）技术的智能问答平台
+AI Knowledge Base System - An intelligent Q&A platform based on RAG (Retrieval Augmented Generation) technology
 
-## ✨ 核心特性
+## ✨ Core Features
 
-- 🤖 **高性能 RAG 引擎** - 并行处理 + Rerank + 向量优化，精准快速
-- 📄 **多格式文档支持** - PDF、Word、Excel、TXT、Markdown
-- 🖼️ **图片回答支持** - 智能检索相关图片，图文并茂的回答体验
-- 🎯 **智能检索** - 向量相似度 + 关键词匹配 + GPT-4o-mini 重排序
-- 👥 **企业级权限** - JWT 认证 + 角色管理 + Token 配额
-- 📊 **数据分析** - Token 使用统计 + 对话历史追踪
-- 🔐 **生产级安全** - 请求限流 + 加密存储 + CORS 保护
+- 🤖 **High-Performance RAG Engine** - Parallel processing + Rerank + Vector optimization for precision and speed
+- 🖼️ **Text and Image Response Support** - Intelligent image retrieval for rich text-image answers
+- 🎯 **Smart Retrieval** - Vector similarity + Keyword matching + GPT-4o-mini reranking
+- 👥 **Permissions** - JWT authentication + Role management + Token quotas
+- 📊 **Data Analytics** - Token usage statistics + Conversation history tracking
+- 🔐 **Production-Grade Security** - Rate limiting + Encrypted storage + CORS protection
 
 
-## 🚀 快速开始
+## 🚀 Quick Start
 
-### 本地开发
+### Local Development
 
-#### 1. 克隆项目
+#### 1. Clone the Project
 
 ```bash
 git clone <repository-url>
 cd abc-ai-knowledgehub
 ```
 
-#### 2. 配置环境变量
+#### 2. Configure Environment Variables
 
-在项目根目录创建 `.env` 文件：
+Create a `.env` file in the project root:
 
 ```bash
-# 必需配置
+# Required Configuration
 OPENAI_API_KEY=sk-your-openai-api-key
 QDRANT_URL=https://your-cluster-id.qdrant.io
 QDRANT_API_KEY=your-qdrant-api-key
 JWT_SECRET_KEY=$(python scripts/generate_jwt_secret.py)
 
-# 可选配置（开发环境使用默认值）
+# Optional Configuration (development environment uses defaults)
 MODE=development
-DATABASE_URL=sqlite+aiosqlite:///./knowledgehub.db  # 开发环境默认 SQLite
+DATABASE_URL=sqlite+aiosqlite:///./knowledgehub.db  # Development environment defaults to SQLite
 FRONTEND_URL=http://localhost:3000
 
-# S3 存储配置（生产环境必需）
-STORAGE_TYPE=s3  # local 或 s3
+# S3 Storage Configuration (required for production)
+STORAGE_TYPE=s3  # local or s3
 AWS_REGION=us-west-1
 S3_BUCKET_NAME=your-bucket-name
-AWS_ACCESS_KEY_ID=your-access-key  # 如果使用 IAM Role 可省略
-AWS_SECRET_ACCESS_KEY=your-secret-key  # 如果使用 IAM Role 可省略
+AWS_ACCESS_KEY_ID=your-access-key  # Can be omitted if using IAM Role
+AWS_SECRET_ACCESS_KEY=your-secret-key  # Can be omitted if using IAM Role
 ```
 
-**生成 JWT Secret Key：**
+**Generate JWT Secret Key:**
 
 ```bash
 python scripts/generate_jwt_secret.py
 ```
 
-#### 3. 启动后端
+#### 3. Start Backend
 
 ```bash
 cd backend
@@ -62,19 +61,19 @@ python -m venv venv
 source venv/bin/activate  # Windows: venv\Scripts\activate
 pip install -r requirements.txt
 
-# 初始化数据库（创建管理员账号）
+# Initialize database (create admin account)
 python scripts/init_db.py
 
-# 启动服务
+# Start service
 uvicorn app.main:app --reload --port 8000
 ```
 
-**默认管理员账号：**
+**Default Admin Account:**
 
-- 邮箱：`admin@abc.com`
-- 密码：`admin123`
+- Email: `admin@abc.com`
+- Password: `admin123`
 
-#### 4. 启动前端
+#### 4. Start Frontend
 
 ```bash
 cd frontend
@@ -82,52 +81,52 @@ npm install
 npm run dev
 ```
 
-访问 http://localhost:3000
+Visit http://localhost:3000
 
-## 🧠 RAG 架构详解
+## 🧠 RAG Architecture Details
 
-### 核心流程
+### Core Workflow
 
 ```
-用户问题
+User Question
   ↓
-【并行处理】Embedding 生成 + 关键词提取
+【Parallel Processing】Embedding Generation + Keyword Extraction
   ↓
-【向量检索】Qdrant 检索 Top 10（HNSW 算法，ef_search=128）
+【Vector Retrieval】Qdrant retrieves Top 10 (HNSW algorithm, ef_search=128)
   ↓
-【智能重排】GPT-4o-mini Rerank → Top 3
+【Smart Reranking】GPT-4o-mini Rerank → Top 3
   ↓
-【流式生成】GPT-4 实时返回答案（SSE）
+【Streaming Generation】GPT-4 real-time answer streaming (SSE)
   ↓
-保存对话 + Token 统计
+Save conversation + Token statistics
 ```
 
-### 1. 文档处理与向量化
+### 1. Document Processing and Vectorization
 
-**文本分块**
-- 块大小：1000 字符，重叠 200 字符
-- 智能切分：优先在段落、句子边界
-- 元数据：文件名、类型、上传时间、chunk 索引
+**Text Chunking**
+- Chunk size: 1000 characters, overlap 200 characters
+- Smart splitting: Prioritizes paragraph and sentence boundaries
+- Metadata: Filename, type, upload time, chunk index
 
-**向量嵌入**
-- 模型：OpenAI `text-embedding-3-small`（1536 维）
-- 缓存：Redis 24h TTL
-- 存储：Qdrant 向量数据库
+**Vector Embedding**
+- Model: OpenAI `text-embedding-3-small` (1536 dimensions)
+- Cache: Redis 24h TTL
+- Storage: Qdrant vector database
 
-### 2. 检索技术
+### 2. Retrieval Technology
 
-**并行处理**
+**Parallel Processing**
 ```python
-# Embedding 生成 + 关键词提取同步执行
+# Embedding generation + Keyword extraction executed in parallel
 asyncio.gather(
     generate_embedding(question),
     extract_keywords(question, max_keywords=3)
 )
 ```
 
-**向量检索**
+**Vector Retrieval**
 ```python
-# HNSW 算法，ef_search=128
+# HNSW algorithm, ef_search=128
 qdrant_service.search(
     query_embedding=embedding,
     limit=10,
@@ -136,9 +135,9 @@ qdrant_service.search(
 )
 ```
 
-**Rerank 重排序**
+**Rerank Reordering**
 ```python
-# GPT-4o-mini 从 10 个候选中选出最相关 3 个
+# GPT-4o-mini selects the most relevant 3 from 10 candidates
 reranked_docs = openai_service.rerank_documents(
     question=question,
     documents=top_10_docs,
@@ -146,114 +145,114 @@ reranked_docs = openai_service.rerank_documents(
 )
 ```
 
-### 3. 检索策略
+### 3. Retrieval Strategy
 
-**向量相似度**
-- 算法：HNSW（分层可导航小世界图）
-- 阈值：动态调整（短问题 0.3，长问题 0.5）
-- 降级：无结果时降至 0.2
+**Vector Similarity**
+- Algorithm: HNSW (Hierarchical Navigable Small World)
+- Threshold: Dynamic adjustment (short questions 0.3, long questions 0.5)
+- Fallback:降级 to 0.2 when no results
 
-**关键词增强**
-- GPT-4o-mini 提取 3 个核心关键词
-- 精确匹配 +15%，部分匹配 +10%
+**Keyword Enhancement**
+- GPT-4o-mini extracts 3 core keywords
+- Exact match +15%, partial match +10%
 
-**去重排序**
-- 内容去重（相似度 > 95%）
-- 文件级去重（每文件最多 5 个片段）
-- 综合排序（向量分数 + 关键词加成）
+**Deduplication and Sorting**
+- Content deduplication (similarity > 95%)
+- File-level deduplication (max 5 segments per file)
+- Comprehensive sorting (vector score + keyword bonus)
 
-### 4. 答案生成
+### 4. Answer Generation
 
-**模型**
-- 主模型：GPT-4（生成答案）
-- 辅助：GPT-4o-mini（提取关键词 + Rerank）
-- 参数：temperature=0.7，max_context=2500 tokens
+**Model**
+- Main model: GPT-4 (answer generation)
+- Auxiliary: GPT-4o-mini (keyword extraction + Rerank)
+- Parameters: temperature=0.7, max_context=2500 tokens
 
-**流式输出**
-- SSE 协议，逐 token 推送
-- 实时显示，完成后返回来源文档
+**Streaming Output**
+- SSE protocol, token-by-token streaming
+- Real-time display, source documents returned upon completion
 
-### 5. 性能指标
+### 5. Performance Metrics
 
-**响应时间**（典型查询）
-- 并行处理：~1.0s
-- 向量检索：~0.5s
-- Rerank：~0.3s
-- 答案生成：~0.7s
-- **总计：~2.5s**
+**Response Time** (typical query)
+- Parallel processing: ~1.0s
+- Vector retrieval: ~0.5s
+- Rerank: ~0.3s
+- Answer generation: ~0.7s
+- **Total: ~2.5s**
 
-**准确度**
-- 向量召回率：85-90%
-- Rerank 后精准度：95%+
-- 关键词增强覆盖：+20%
+**Accuracy**
+- Vector recall: 85-90%
+- Post-Rerank precision: 95%+
+- Keyword enhancement coverage: +20%
 
-## 🏗️ 技术栈
+## 🏗️ Technology Stack
 
-### 后端
-- **框架**：FastAPI（异步高性能）
-- **ORM**：SQLAlchemy（支持 SQLite + PostgreSQL）
-- **向量库**：Qdrant Cloud（HNSW 索引）
-- **AI**：OpenAI GPT-4 + GPT-4o-mini + Embeddings
-- **认证**：JWT + Bcrypt
-- **缓存**：Redis（Embedding + 检索结果）
-- **限流**：SlowAPI（100req/min 全局，30req/min 问答）
-- **重试**：Tenacity（指数退避）
-- **日志**：CloudWatch Logs
+### Backend
+- **Framework**: FastAPI (async high-performance)
+- **ORM**: SQLAlchemy (supports SQLite + PostgreSQL)
+- **Vector DB**: Qdrant Cloud (HNSW index)
+- **AI**: OpenAI GPT-4 + GPT-4o-mini + Embeddings
+- **Authentication**: JWT + Bcrypt
+- **Cache**: Redis (Embedding + retrieval results)
+- **Rate Limiting**: SlowAPI (100req/min global, 30req/min Q&A)
+- **Retry**: Tenacity (exponential backoff)
+- **Logging**: CloudWatch Logs
 
-### 前端
-- **框架**：Next.js 14（App Router）
-- **语言**：TypeScript
-- **样式**：TailwindCSS
-- **状态管理**：Zustand
-- **实时通信**：SSE（Server-Sent Events）
+### Frontend
+- **Framework**: Next.js 14 (App Router)
+- **Language**: TypeScript
+- **Styling**: TailwindCSS
+- **State Management**: Zustand
+- **Real-time Communication**: SSE (Server-Sent Events)
 
-### 基础设施
-- **开发环境**：SQLite + 本地文件存储
-- **生产环境**：
-  - **计算**：AWS ECS Fargate（Docker 容器）
-  - **数据库**：AWS RDS PostgreSQL
-  - **文件存储**：AWS S3（持久化存储）
-  - **向量库**：Qdrant Cloud（独立部署）
-  - **负载均衡**：AWS ALB
-  - **配置管理**：AWS Secrets Manager
-  - **前端部署**：Vercel（全球 CDN）
-  - **CI/CD**：GitHub Actions
+### Infrastructure
+- **Development Environment**: SQLite + Local file storage
+- **Production Environment**:
+  - **Compute**: AWS ECS Fargate (Docker containers)
+  - **Database**: AWS RDS PostgreSQL
+  - **File Storage**: AWS S3 (persistent storage)
+  - **Vector DB**: Qdrant Cloud (independent deployment)
+  - **Load Balancing**: AWS ALB
+  - **Configuration Management**: AWS Secrets Manager
+  - **Frontend Deployment**: Vercel (global CDN)
+  - **CI/CD**: GitHub Actions
 
-### 数据库设计
-- **User**：用户信息（邮箱、密码哈希、角色）
-- **Document**：文档元数据（文件 ID、名称、大小、上传者）
-- **Conversation**：对话会话（用户 ID、标题）
-- **Message**：消息记录（问题、答案、来源文档）
-- **TokenUsage**：Token 使用统计（每日/每月配额）
+### Database Design
+- **User**: User information (email, password hash, role)
+- **Document**: Document metadata (file ID, name, size, uploader)
+- **Conversation**: Conversation sessions (user ID, title)
+- **Message**: Message records (question, answer, source documents)
+- **TokenUsage**: Token usage statistics (daily/monthly quotas)
 
-## 🚢 部署指南
+## 🚢 Deployment Guide
 
-### AWS ECS 部署
+### AWS ECS Deployment
 
-**前置准备**
-1. AWS 资源：ECS 集群、ECR 仓库、RDS PostgreSQL、ALB、S3 Bucket
-2. AWS Secrets Manager 配置：
-   - `knowledgehub/database-url` - PostgreSQL 连接字符串
-   - `knowledgehub/openai-api-key` - OpenAI API 密钥
-   - `knowledgehub/qdrant-url` - Qdrant 集群 URL
-   - `knowledgehub/qdrant-api-key` - Qdrant API 密钥
-   - `knowledgehub/jwt-secret` - JWT 密钥
-   - `knowledgehub/frontend-url` - Vercel 域名
-   - `knowledgehub/s3-bucket-name` - S3 Bucket 名称
-   - `knowledgehub/aws-access-key` - (可选) AWS Access Key
-   - `knowledgehub/aws-secret-key` - (可选) AWS Secret Key
+**Prerequisites**
+1. AWS Resources: ECS cluster, ECR repository, RDS PostgreSQL, ALB, S3 Bucket
+2. AWS Secrets Manager configuration:
+   - `knowledgehub/database-url` - PostgreSQL connection string
+   - `knowledgehub/openai-api-key` - OpenAI API key
+   - `knowledgehub/qdrant-url` - Qdrant cluster URL
+   - `knowledgehub/qdrant-api-key` - Qdrant API key
+   - `knowledgehub/jwt-secret` - JWT secret
+   - `knowledgehub/frontend-url` - Vercel domain
+   - `knowledgehub/s3-bucket-name` - S3 Bucket name
+   - `knowledgehub/aws-access-key` - (Optional) AWS Access Key
+   - `knowledgehub/aws-secret-key` - (Optional) AWS Secret Key
 
-**GitHub Actions 自动部署**
+**GitHub Actions Auto Deployment**
 ```bash
-# 配置 GitHub Secrets
+# Configure GitHub Secrets
 AWS_ACCESS_KEY_ID
 AWS_SECRET_ACCESS_KEY
 
-# 推送到 main 分支自动部署
+# Push to main branch for auto deployment
 git push origin main
 ```
 
-**初始化数据库**
+**Initialize Database**
 ```bash
 aws ecs run-task \
   --cluster knowledgehub-cluster \
@@ -261,58 +260,49 @@ aws ecs run-task \
   --overrides '{"containerOverrides":[{"name":"backend","command":["python","scripts/init_db.py"]}]}'
 ```
 
-### Vercel 前端部署
+### Vercel Frontend Deployment
 
-1. 连接 GitHub 仓库到 Vercel
-2. 配置环境变量：
+1. Connect GitHub repository to Vercel
+2. Configure environment variables:
    ```
    NEXT_PUBLIC_API_URL=https://your-backend-api.com
    ```
-3. Root Directory：`frontend`
-4. 自动部署（推送触发）
+3. Root Directory: `frontend`
+4. Auto deployment (triggered by push)
 
-## 📁 项目结构
+## 📁 Project Structure
 
 ```
 abc-ai-knowledgehub/
 ├── backend/
 │   ├── app/
-│   │   ├── api/           # REST API 端点
-│   │   ├── services/      # RAG、OpenAI、Qdrant 服务
-│   │   ├── db/            # 数据库模型
-│   │   ├── core/          # 配置和常量
-│   │   └── utils/         # 工具函数
+│   │   ├── api/           # REST API endpoints
+│   │   ├── services/      # RAG, OpenAI, Qdrant services
+│   │   ├── db/            # Database models
+│   │   ├── core/          # Configuration and constants
+│   │   └── utils/         # Utility functions
 │   └── Dockerfile
 ├── frontend/
-│   ├── app/               # Next.js 页面
-│   ├── components/        # React 组件
-│   └── lib/               # API 客户端
-├── scripts/               # 工具脚本
+│   ├── app/               # Next.js pages
+│   ├── components/        # React components
+│   └── lib/               # API client
+├── scripts/               # Utility scripts
 └── .github/workflows/     # CI/CD
 ```
 
 
-## 🎮 使用指南
+## 🎮 User Guide
 
-**管理员**
-- 登录管理后台（右上角按钮）
-- 上传/管理文档
-- 上传/管理图片（支持标签和描述）
-- 查看用户统计
+**Administrator**
+- Login to admin panel (top right button)
+- Upload/manage documents
+- Upload/manage images (with tags and descriptions)
+- View user statistics
 
-**普通用户**
-- 注册/登录账号
-- 智能问答（支持图文回答）
-- 查看来源文档和相关图片
-
-
-## 🖼️ 图片回答功能
-
-系统现在支持在回答中提供相关图片！详细文档：
-
-- [快速开始](./docs/IMAGE_FEATURE_QUICKSTART.md) - 5分钟快速体验
-- [使用指南](./docs/IMAGE_FEATURE_GUIDE.md) - 完整功能说明
-- [实现总结](./docs/IMAGE_FEATURE_SUMMARY.md) - 技术实现详情
+**Regular User**
+- Register/login account
+- Intelligent Q&A (supports text-image answers)
+- View source documents and related images
 
 
 ## 📝 License
