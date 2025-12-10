@@ -35,14 +35,10 @@ interface ImageManagementProps {
 
 export default function ImageManagement({ isOpen }: ImageManagementProps) {
     const [images, setImages] = useState<ImageData[]>([])
-    const [tags, setTags] = useState<ImageTag[]>([])
     const [loading, setLoading] = useState(false)
     const [uploading, setUploading] = useState(false)
     const [selectedImage, setSelectedImage] = useState<File | null>(null)
     const [description, setDescription] = useState('')
-    const [altText, setAltText] = useState('')
-    const [selectedTags, setSelectedTags] = useState<number[]>([])
-    const [newTagName, setNewTagName] = useState('')
     const [showUploadForm, setShowUploadForm] = useState(false)
 
     const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
@@ -57,39 +53,12 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
         }
     }
 
-    const loadTags = async () => {
-        try {
-            const response = await apiClient.get('/images/tags')
-            setTags(response.data)
-        } catch (error: any) {
-            console.error('Failed to load tags:', error)
-            toast.error('Failed to load tags')
-        }
-    }
-
     useEffect(() => {
         if (isOpen) {
             setLoading(true)
-            Promise.all([loadImages(), loadTags()]).finally(() => setLoading(false))
+            loadImages().finally(() => setLoading(false))
         }
     }, [isOpen])
-
-    const handleCreateTag = async () => {
-        if (!newTagName.trim()) {
-            toast.error('Please enter a tag name')
-            return
-        }
-
-        try {
-            await apiClient.post('/images/tags', { name: newTagName.trim() })
-            toast.success('Tag created successfully')
-            setNewTagName('')
-            await loadTags()
-        } catch (error: any) {
-            console.error('Failed to create tag:', error)
-            toast.error(error.response?.data?.detail || 'Failed to create tag')
-        }
-    }
 
     const handleImageUpload = async () => {
         if (!selectedImage) {
@@ -110,15 +79,17 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
             return
         }
 
+        // Validate description
+        if (!description || !description.trim()) {
+            toast.error('Please enter a description for the image')
+            return
+        }
+
         try {
             setUploading(true)
             const formData = new FormData()
             formData.append('file', selectedImage)
-            if (description) formData.append('description', description)
-            if (altText) formData.append('alt_text', altText)
-            if (selectedTags.length > 0) {
-                formData.append('tag_ids', selectedTags.join(','))
-            }
+            formData.append('description', description.trim())
 
             // 不要手动设置 Content-Type，让 axios 自动处理 FormData
             await apiClient.post('/images/upload', formData)
@@ -126,8 +97,6 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
             toast.success('Image uploaded successfully!')
             setSelectedImage(null)
             setDescription('')
-            setAltText('')
-            setSelectedTags([])
             setShowUploadForm(false)
             await loadImages()
         } catch (error: any) {
@@ -183,33 +152,15 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
         <div>
             {/* Header Actions */}
             <div className="flex justify-between items-center mb-6">
-                <div className="flex items-center gap-4">
-                    <button
-                        onClick={() => setShowUploadForm(!showUploadForm)}
-                        className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
-                    >
-                        <Upload className="w-4 h-4" />
-                        Upload Image
-                    </button>
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="text"
-                            placeholder="New tag name"
-                            value={newTagName}
-                            onChange={(e) => setNewTagName(e.target.value)}
-                            className="px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                            onKeyPress={(e) => e.key === 'Enter' && handleCreateTag()}
-                        />
-                        <button
-                            onClick={handleCreateTag}
-                            className="px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors flex items-center gap-2"
-                        >
-                            <Tag className="w-4 h-4" />
-                            Create Tag
-                        </button>
-                    </div>
-                </div>
+                <button
+                    onClick={() => setShowUploadForm(!showUploadForm)}
+                    className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
+                >
+                    <Upload className="w-4 h-4" />
+                    Upload Image
+                </button>
             </div>
+
 
             {/* Upload Form */}
             {showUploadForm && (
@@ -233,62 +184,25 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
 
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Description
+                                Description *
                             </label>
                             <textarea
                                 value={description}
                                 onChange={(e) => setDescription(e.target.value)}
-                                placeholder="Describe the image content (used for search)"
+                                placeholder="Describe the image content in detail (e.g., 'plywood sheets stacked in warehouse'). This description will be used to match user questions."
                                 className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                                rows={3}
+                                rows={4}
+                                required
                             />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Alt Text
-                            </label>
-                            <input
-                                type="text"
-                                value={altText}
-                                onChange={(e) => setAltText(e.target.value)}
-                                placeholder="Alternative text for accessibility"
-                                className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
-                            />
-                        </div>
-
-                        <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                                Tags
-                            </label>
-                            <div className="flex flex-wrap gap-2">
-                                {tags.map((tag) => (
-                                    <label
-                                        key={tag.id}
-                                        className="flex items-center gap-2 px-3 py-1 bg-white border border-gray-300 rounded-lg cursor-pointer hover:bg-gray-50"
-                                    >
-                                        <input
-                                            type="checkbox"
-                                            checked={selectedTags.includes(tag.id)}
-                                            onChange={(e) => {
-                                                if (e.target.checked) {
-                                                    setSelectedTags([...selectedTags, tag.id])
-                                                } else {
-                                                    setSelectedTags(selectedTags.filter((id) => id !== tag.id))
-                                                }
-                                            }}
-                                            className="rounded"
-                                        />
-                                        <span className="text-sm">{tag.name}</span>
-                                    </label>
-                                ))}
-                            </div>
+                            <p className="text-xs text-gray-500 mt-1">
+                                💡 Tip: Include keywords that users might search for (e.g., product names, materials, features)
+                            </p>
                         </div>
 
                         <div className="flex gap-2">
                             <button
                                 onClick={handleImageUpload}
-                                disabled={!selectedImage || uploading}
+                                disabled={!selectedImage || !description.trim() || uploading}
                                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
                             >
                                 {uploading ? 'Uploading...' : 'Upload'}
@@ -298,8 +212,6 @@ export default function ImageManagement({ isOpen }: ImageManagementProps) {
                                     setShowUploadForm(false)
                                     setSelectedImage(null)
                                     setDescription('')
-                                    setAltText('')
-                                    setSelectedTags([])
                                 }}
                                 className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 transition-colors"
                             >
