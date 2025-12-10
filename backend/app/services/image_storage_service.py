@@ -1,22 +1,23 @@
 """
 图片存储服务 - 适配器
-为图片管理提供统一的存储接口
+为图片管理提供统一的存储接口，支持 S3 和本地存储
 """
 import io
 from typing import Optional
 from pathlib import Path
-from app.services.local_storage_service import storage_service as base_storage_service
+from app.services.local_storage_service import storage_service as base_storage_service, S3StorageService, LocalStorageService
 import logging
 
 logger = logging.getLogger(__name__)
 
 
 class ImageStorageService:
-    """图片存储服务适配器"""
+    """图片存储服务适配器 - 支持 S3 和本地存储"""
     
     def __init__(self):
         self.base_service = base_storage_service
-        logger.info("图片存储服务初始化完成")
+        self.is_s3 = isinstance(self.base_service, S3StorageService)
+        logger.info(f"图片存储服务初始化完成 (类型: {'S3' if self.is_s3 else 'Local'})")
     
     async def save_file(
         self,
@@ -39,7 +40,7 @@ class ImageStorageService:
             # 将字节内容转换为 BinaryIO
             file_obj = io.BytesIO(file_content)
             
-            # 调用底层存储服务
+            # 调用底层存储服务的 upload_file 方法
             file_id = self.base_service.upload_file(
                 file_obj,
                 filename,
@@ -72,7 +73,7 @@ class ImageStorageService:
             file_id = Path(storage_path).stem
             original_filename = storage_path
             
-            # 调用底层存储服务
+            # 调用底层存储服务的 download_file 方法
             content = self.base_service.download_file(file_id, original_filename)
             
             logger.info(f"文件获取成功: {storage_path}")
@@ -100,7 +101,7 @@ class ImageStorageService:
             file_id = Path(storage_path).stem
             original_filename = storage_path
             
-            # 调用底层存储服务
+            # 调用底层存储服务的 delete_file 方法
             result = self.base_service.delete_file(file_id, original_filename)
             
             logger.info(f"文件删除成功: {storage_path}")
