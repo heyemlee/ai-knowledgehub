@@ -8,6 +8,7 @@ from app.models.schemas import ConversationResponse, MessageResponse
 from app.utils.auth import get_current_user
 from app.db.database import get_db
 from app.db.models import Conversation, Message
+from app.core.constants import ConversationConfig
 from typing import List
 import logging
 
@@ -21,19 +22,35 @@ async def list_conversations(
     db: AsyncSession = Depends(get_db)
 ):
     """
-    获取用户的所有对话列表
+    获取用户的所有对话列表（自动保留最新 10 个）
     """
     try:
         user_id = current_user.get("user_id")
         if not user_id:
             raise HTTPException(status_code=401, detail="无法获取用户ID")
         
+        # 获取所有对话，按更新时间降序
         result = await db.execute(
             select(Conversation)
             .where(Conversation.user_id == user_id)
             .order_by(Conversation.updated_at.desc())
         )
         conversations = result.scalars().all()
+        
+        # 自动清理：只保留最新的对话
+        if ConversationConfig.ENABLE_AUTO_CLEANUP and len(conversations) > ConversationConfig.MAX_CONVERSATIONS_PER_USER:
+            # 获取需要删除的旧对话
+            conversations_to_delete = conversations[ConversationConfig.MAX_CONVERSATIONS_PER_USER:]
+            
+            # 删除旧对话（会级联删除相关消息）
+            for conv in conversations_to_delete:
+                await db.delete(conv)
+            
+            await db.commit()
+            logger.info(f"用户 {user_id} 自动清理了 {len(conversations_to_delete)} 个旧对话")
+            
+            # 只保留最新的对话
+            conversations = conversations[:ConversationConfig.MAX_CONVERSATIONS_PER_USER]
         
         return [
             ConversationResponse(
