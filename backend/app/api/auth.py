@@ -91,21 +91,52 @@ async def register(
     #         detail="生产环境不支持注册"
     #     )
     
-    existing_user = await get_user_by_email(db, user_data.email)
+    # 验证注册码
+    from app.db.models import RegistrationCode
+    result = await db.execute(
+        select(RegistrationCode).where(
+            RegistrationCode.code == user_data.registration_code,
+            RegistrationCode.is_active == True
+        )
+    )
+    reg_code = result.scalar_one_or_none()
+    
+    if not reg_code:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="注册码无效或已禁用"
+        )
+    
+    # 检查 Token 配额
+    if reg_code.token_quota is not None:
+        remaining_tokens = reg_code.token_quota - reg_code.tokens_used
+        if remaining_tokens < reg_code.tokens_per_registration:
+            raise HTTPException(
+                status_code=status.HTTP_400_BAD_REQUEST,
+                detail=f"注册码 Token 配额不足。剩余: {remaining_tokens} tokens, 需要: {reg_code.tokens_per_registration} tokens"
+            )
+    
+    # 检查用户是否已存在
+    existing_user = await get_user_by_email(db, user_data.account)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
             detail="用户已存在"
         )
     
+    # 创建新用户
     new_user = User(
-        email=user_data.email,
+        email=user_data.account,  # 使用 account 字段作为 email
         hashed_password=get_password_hash(user_data.password),
-        full_name=user_data.full_name,
+        full_name=None,  # 不再使用 full_name
         is_active=True
     )
     
     db.add(new_user)
+    
+    # 消耗 Token 配额
+    reg_code.tokens_used += reg_code.tokens_per_registration
+    
     await db.commit()
     await db.refresh(new_user)
     

@@ -49,9 +49,9 @@ export interface LoginRequest {
 }
 
 export interface RegisterRequest {
-  email: string
+  account: string
   password: string
-  full_name?: string
+  registration_code: string
 }
 
 export interface LoginResponse {

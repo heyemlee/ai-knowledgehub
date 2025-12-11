@@ -35,40 +35,40 @@ class UserLogin(BaseModel):
         return v
 
 
+
 class UserCreate(BaseModel):
     """用户创建请求"""
-    email: EmailStr = Field(..., min_length=1, max_length=255)
-    password: str = Field(..., min_length=8, max_length=128)
-    full_name: Optional[str] = Field(None, max_length=100)
+    account: str = Field(..., min_length=1, max_length=255)  # 账号：可以是名字或数字
+    password: str = Field(..., min_length=6, max_length=128)  # 密码最少6位
+    registration_code: str = Field(..., min_length=1, max_length=100)  # 新增：注册码
     
-    @field_validator('email')
+    @field_validator('account')
     @classmethod
-    def validate_email(cls, v):
-        """验证并清理邮箱"""
-        return InputSanitizer.sanitize_email(v)
+    def validate_account(cls, v):
+        """验证并清理账号"""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("账号不能为空")
+        return v.strip()
     
     @field_validator('password')
     @classmethod
     def validate_password(cls, v):
-        """验证密码强度"""
+        """验证密码"""
         if not v or len(v.strip()) == 0:
             raise ValueError("密码不能为空")
-        if len(v) < 8:
-            raise ValueError("密码长度至少8个字符")
+        if len(v) < 6:
+            raise ValueError("密码长度至少6个字符")
         if len(v) > 128:
             raise ValueError("密码长度不能超过128字符")
-        # 检查是否包含数字和字母
-        if not any(c.isdigit() for c in v) or not any(c.isalpha() for c in v):
-            raise ValueError("密码必须包含至少一个数字和一个字母")
         return v
     
-    @field_validator('full_name')
+    @field_validator('registration_code')
     @classmethod
-    def validate_full_name(cls, v):
-        """验证并清理全名"""
-        if v is None:
-            return None
-        return InputSanitizer.sanitize_full_name(v)
+    def validate_registration_code(cls, v):
+        """验证注册码"""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("注册码不能为空")
+        return v.strip()
 
 
 class UserResponse(BaseModel):
@@ -273,4 +273,48 @@ class ChatResponseWithImages(BaseModel):
     images: List[ImageResponse] = []  # 新增：相关图片列表
     conversation_id: str
     tokens_used: Optional[int] = None
+
+
+# ==============================
+# 注册码相关 Schemas
+# ==============================
+
+class RegistrationCodeCreate(BaseModel):
+    """创建注册码请求 - Token 计量"""
+    code: str = Field(..., min_length=1, max_length=100)
+    description: Optional[str] = Field(None, max_length=500)
+    token_quota: Optional[int] = Field(None, ge=1)  # Token 配额，None 表示无限制
+    tokens_per_registration: int = Field(800000, ge=1)  # 每次注册分配的 tokens，默认 800000 (月度配额)
+    
+    @field_validator('code')
+    @classmethod
+    def validate_code(cls, v):
+        """验证注册码"""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("注册码不能为空")
+        return v.strip()
+
+
+class RegistrationCodeUpdate(BaseModel):
+    """更新注册码请求"""
+    description: Optional[str] = Field(None, max_length=500)
+    is_active: Optional[bool] = None
+    token_quota: Optional[int] = Field(None, ge=1)
+
+
+class RegistrationCodeResponse(BaseModel):
+    """注册码响应 - Token 计量"""
+    id: int
+    code: str
+    description: Optional[str] = None
+    is_active: bool
+    token_quota: Optional[int] = None  # Token 配额
+    tokens_used: int  # 已使用的 tokens
+    tokens_per_registration: int  # 每次注册消耗的 tokens
+    created_by: int
+    created_at: datetime
+    updated_at: datetime
+    
+    class Config:
+        from_attributes = True
 
