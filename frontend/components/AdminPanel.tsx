@@ -1,9 +1,9 @@
 'use client'
 
 import { useEffect, useState } from 'react'
-import { adminApi, AdminDocument, AdminUser, DocumentStats, UserStats } from '@/lib/adminApi'
+import { adminApi, AdminDocument, AdminUser, DocumentStats, UserStats, registrationCodeApi, RegistrationCode, RegistrationCodeCreate } from '@/lib/adminApi'
 import { documentsAPI } from '@/lib/api'
-import { X, Upload, Trash2, Users, FileText, Download, Image } from 'lucide-react'
+import { X, Upload, Trash2, Users, FileText, Download, Image, Key, Plus, Edit2 } from 'lucide-react'
 import { toast } from './Toast'
 import { confirm } from './ConfirmDialog'
 import ImageManagement from './ImageManagement'
@@ -14,18 +14,25 @@ interface AdminPanelProps {
   onClose: () => void
 }
 
-type Tab = 'dashboard' | 'documents' | 'images' | 'users'
+type Tab = 'dashboard' | 'documents' | 'images' | 'users' | 'registration-codes'
 
 
 export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const [activeTab, setActiveTab] = useState<Tab>('dashboard')
   const [documents, setDocuments] = useState<AdminDocument[]>([])
   const [users, setUsers] = useState<AdminUser[]>([])
+  const [registrationCodes, setRegistrationCodes] = useState<RegistrationCode[]>([])
   const [documentStats, setDocumentStats] = useState<DocumentStats | null>(null)
   const [userStats, setUserStats] = useState<UserStats | null>(null)
   const [loading, setLoading] = useState(false)
   const [searchTerm, setSearchTerm] = useState('')
   const [uploading, setUploading] = useState(false)
+
+  // Registration code modal states - Token 计量
+  const [showCodeModal, setShowCodeModal] = useState(false)
+  const [newCode, setNewCode] = useState('')
+  const [newCodeDescription, setNewCodeDescription] = useState('')
+  const [newTokenQuota, setNewTokenQuota] = useState<string>('8000000')  // Token 配额，默认 8M (10 用户)
 
   const formatLosAngelesDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -151,6 +158,73 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
     }
   }
 
+  const loadRegistrationCodes = async () => {
+    try {
+      const codes = await registrationCodeApi.getAll()
+      setRegistrationCodes(codes)
+    } catch (error: any) {
+      console.error('Failed to load registration codes:', error)
+      toast.error('Failed to load registration codes')
+    }
+  }
+
+
+  const handleCreateCode = async () => {
+    if (!newCode.trim()) {
+      toast.error('Registration code cannot be empty')
+      return
+    }
+
+    try {
+      const data: RegistrationCodeCreate = {
+        code: newCode.trim(),
+        description: newCodeDescription.trim() || undefined,
+        token_quota: newTokenQuota ? parseInt(newTokenQuota) : undefined
+        // tokens_per_registration 使用后端默认值 800000 (月度配额)
+      }
+      await registrationCodeApi.create(data)
+      toast.success('Registration code created successfully')
+      setShowCodeModal(false)
+      setNewCode('')
+      setNewCodeDescription('')
+      setNewTokenQuota('8000000')  // 重置为默认值
+      await loadRegistrationCodes()
+    } catch (error: any) {
+      console.error('Failed to create code:', error)
+      toast.error(error.response?.data?.detail || 'Failed to create registration code')
+    }
+  }
+
+  const handleToggleCodeStatus = async (id: number, currentStatus: boolean) => {
+    try {
+      await registrationCodeApi.update(id, { is_active: !currentStatus })
+      toast.success('Status updated')
+      await loadRegistrationCodes()
+    } catch (error: any) {
+      console.error('Failed to update status:', error)
+      toast.error('Failed to update status')
+    }
+  }
+
+  const handleDeleteCode = async (id: number, code: string) => {
+    const confirmed = await confirm(`Are you sure you want to delete registration code "${code}"?`, {
+      title: 'Delete Registration Code',
+      confirmText: 'Delete',
+      cancelText: 'Cancel',
+    })
+
+    if (!confirmed) return
+
+    try {
+      await registrationCodeApi.delete(id)
+      toast.success('Registration code deleted')
+      await loadRegistrationCodes()
+    } catch (error: any) {
+      console.error('Failed to delete code:', error)
+      toast.error('Failed to delete registration code')
+    }
+  }
+
   useEffect(() => {
     if (!isOpen) return
 
@@ -162,6 +236,9 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
           break
         case 'users':
           await loadUsers()
+          break
+        case 'registration-codes':
+          await loadRegistrationCodes()
           break
         case 'dashboard':
           await loadStats()
@@ -230,6 +307,15 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
               }`}
           >
             User Management
+          </button>
+          <button
+            onClick={() => setActiveTab('registration-codes')}
+            className={`px-6 py-3 text-sm font-medium transition-colors ${activeTab === 'registration-codes'
+              ? 'text-blue-600 border-b-2 border-blue-600'
+              : 'text-gray-500 hover:text-gray-700'
+              }`}
+          >
+            Registration Codes
           </button>
         </div>
 
@@ -377,8 +463,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                     <table className="w-full">
                       <thead>
                         <tr className="border-b border-gray-200">
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Email</th>
-                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Name</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
@@ -390,7 +475,6 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                             <td className="px-4 py-3">
                               <div className="font-medium text-gray-900">{user.email}</div>
                             </td>
-                            <td className="px-4 py-3 text-gray-600">{user.full_name || '-'}</td>
                             <td className="px-4 py-3">
                               <span className={`px-2 py-1 text-xs rounded-full ${user.role === 'admin'
                                 ? 'bg-purple-100 text-purple-800'
@@ -415,10 +499,155 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                   </div>
                 </div>
               )}
+
+              {activeTab === 'registration-codes' && (
+                <div>
+                  <div className="flex justify-between items-center mb-6">
+                    <p className="text-sm text-gray-600">Total {registrationCodes.length} registration codes</p>
+                    <button
+                      onClick={() => setShowCodeModal(true)}
+                      className="flex items-center px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+                    >
+                      <Plus className="w-4 h-4 mr-2" />
+                      Create Code
+                    </button>
+                  </div>
+
+                  <div className="overflow-x-auto">
+                    <table className="w-full">
+                      <thead>
+                        <tr className="border-b border-gray-200">
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Code</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Description</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Usage</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {registrationCodes.map((code) => (
+                          <tr key={code.id} className="border-b border-gray-100 hover:bg-gray-50">
+                            <td className="px-4 py-3">
+                              <div className="font-medium text-gray-900 font-mono">{code.code}</div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{code.description || '-'}</td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleToggleCodeStatus(code.id, code.is_active)}
+                                className={`px-2 py-1 text-xs rounded-full cursor-pointer hover:opacity-80 ${code.is_active
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                                  }`}
+                              >
+                                {code.is_active ? 'Active' : 'Inactive'}
+                              </button>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">
+                              <div className="flex flex-col gap-1">
+                                <div className="flex items-center gap-1">
+                                  <span className="font-medium">{code.tokens_used.toLocaleString()} / {code.token_quota?.toLocaleString() || '∞'} tokens</span>
+                                  {code.token_quota && code.token_quota >= 100000 && (
+                                    <span className="text-xs text-gray-400" title={`100k tokens = 100,000 tokens (${Math.floor(100000 / code.tokens_per_registration)} registrations at ${code.tokens_per_registration} tokens/reg)`}>ℹ️</span>
+                                  )}
+                                </div>
+                                <span className="text-xs text-gray-500">{code.tokens_per_registration} tokens/registration</span>
+                              </div>
+                            </td>
+                            <td className="px-4 py-3 text-gray-600">{formatLosAngelesDate(code.created_at)}</td>
+                            <td className="px-4 py-3">
+                              <button
+                                onClick={() => handleDeleteCode(code.id, code.code)}
+                                className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                title="Delete"
+                              >
+                                <Trash2 className="w-4 h-4" />
+                              </button>
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                </div>
+              )}
             </>
           )}
         </div>
       </div>
+
+      {/* Create Code Modal */}
+      {showCodeModal && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-black mb-4">Create Registration Code</h3>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Code *
+                </label>
+                <input
+                  type="text"
+                  value={newCode}
+                  onChange={(e) => setNewCode(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="Enter registration code"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description (optional)
+                </label>
+                <input
+                  type="text"
+                  value={newCodeDescription}
+                  onChange={(e) => setNewCodeDescription(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="e.g., Team registration, Event code"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Token Quota (optional, leave empty for unlimited)
+                  <span className="block text-xs text-gray-500 font-normal mt-1">
+                    Default: Each user gets 800,000 tokens/month (≈400 questions)
+                  </span>
+                  <span className="block text-xs text-gray-500 font-normal mt-1">
+                    e.g., 8000000 tokens = 10 users × 800k tokens/user
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  value={newTokenQuota}
+                  onChange={(e) => setNewTokenQuota(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="Enter token quota (e.g., 8000000 for 10 users)"
+                  min="1"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowCodeModal(false)
+                  setNewCode('')
+                  setNewCodeDescription('')
+                  setNewTokenQuota('8000000')  // 重置为默认值
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleCreateCode}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

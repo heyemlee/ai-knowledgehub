@@ -132,3 +132,22 @@ class Image(Base):
     owner = relationship("User", backref="images")
     tags = relationship("ImageTag", secondary=image_tag_association, back_populates="images")
 
+
+class RegistrationCode(Base):
+    """注册码模型 - 基于 Token 计量"""
+    __tablename__ = "registration_codes"
+    
+    id = Column(Integer, primary_key=True, index=True)
+    code = Column(String(100), unique=True, nullable=False, index=True)  # 注册码
+    description = Column(String(500), nullable=True)  # 描述（可选）
+    is_active = Column(Boolean, default=True, nullable=False)  # 是否启用
+    token_quota = Column(Integer, nullable=True)  # Token 配额（None 表示无限制）
+    tokens_used = Column(Integer, default=0, nullable=False)  # 已使用的 tokens
+    tokens_per_registration = Column(Integer, default=800000, nullable=False)  # 每次注册分配的 tokens (月度配额: 400问题 × 2000 tokens)
+    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)  # 创建者
+    created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
+    updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
+    
+    # 关系
+    creator = relationship("User", backref="registration_codes")
+

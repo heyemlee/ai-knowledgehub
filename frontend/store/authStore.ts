@@ -15,8 +15,8 @@ interface AuthState {
   isAuthenticated: boolean
   user: User | null
   token: string | null
-  login: (email: string, password: string) => Promise<void>
-  register: (email: string, password: string, fullName?: string) => Promise<void>
+  login: (account: string, password: string) => Promise<void>
+  register: (account: string, password: string, registrationCode: string) => Promise<void>
   logout: () => void
   checkAuth: () => void
 }
@@ -26,14 +26,14 @@ export const useAuthStore = create<AuthState>((set) => ({
   user: null,
   token: null,
 
-  login: async (email: string, password: string) => {
+  login: async (account: string, password: string) => {
     try {
-      const response = await authAPI.login({ email, password })
+      const response = await authAPI.login({ email: account, password })
       localStorage.setItem('access_token', response.access_token)
-      
+
       // 获取用户信息
       const userData = await authAPI.getMe()
-      
+
       set({
         isAuthenticated: true,
         user: userData,
@@ -44,11 +44,11 @@ export const useAuthStore = create<AuthState>((set) => ({
     }
   },
 
-  register: async (email: string, password: string, fullName?: string) => {
+  register: async (account: string, password: string, registrationCode: string) => {
     try {
-      await authAPI.register({ email, password, full_name: fullName })
+      await authAPI.register({ account, password, registration_code: registrationCode })
       // 注册成功后自动登录
-      await useAuthStore.getState().login(email, password)
+      await useAuthStore.getState().login(account, password)
     } catch (error) {
       throw error
     }

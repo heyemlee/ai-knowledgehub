@@ -5,9 +5,9 @@ import { useAuthStore } from '@/store/authStore'
 
 export default function LoginForm() {
   const [isRegister, setIsRegister] = useState(false)
-  const [email, setEmail] = useState('')
+  const [account, setAccount] = useState('')
   const [password, setPassword] = useState('')
-  const [fullName, setFullName] = useState('')
+  const [registrationCode, setRegistrationCode] = useState('')
   const [error, setError] = useState('')
   const [loading, setLoading] = useState(false)
   const login = useAuthStore((state) => state.login)
@@ -20,14 +20,14 @@ export default function LoginForm() {
 
     try {
       if (isRegister) {
-        await register(email, password, fullName || undefined)
+        await register(account, password, registrationCode)
       } else {
-        await login(email, password)
+        await login(account, password)
       }
     } catch (err: any) {
       console.error('认证错误:', err)
 
-      let errorMessage = isRegister ? 'Registration failed, please check your information' : 'Login failed, please check email and password'
+      let errorMessage = isRegister ? 'Registration failed, please check your information' : 'Login failed, please check account and password'
 
       if (err.response?.data?.detail) {
         const detail = err.response.data.detail
@@ -77,8 +77,8 @@ export default function LoginForm() {
                 setError('')
               }}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${!isRegister
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900'
+                ? 'bg-white text-black shadow-sm'
+                : 'text-gray-500 hover:text-gray-900'
                 }`}
             >
               Login
@@ -90,8 +90,8 @@ export default function LoginForm() {
                 setError('')
               }}
               className={`flex-1 py-2.5 px-4 rounded-lg text-sm font-medium transition-all ${isRegister
-                  ? 'bg-white text-black shadow-sm'
-                  : 'text-gray-500 hover:text-gray-900'
+                ? 'bg-white text-black shadow-sm'
+                : 'text-gray-500 hover:text-gray-900'
                 }`}
             >
               Register
@@ -105,41 +105,24 @@ export default function LoginForm() {
               </div>
             )}
 
-            {isRegister && (
-              <div>
-                <label htmlFor="fullName" className="block text-sm font-medium text-gray-700 mb-2">
-                  Name
-                  <span className="text-gray-400 text-xs ml-2">(optional)</span>
-                </label>
-                <input
-                  id="fullName"
-                  type="text"
-                  value={fullName}
-                  onChange={(e) => setFullName(e.target.value)}
-                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
-                  placeholder="Your name"
-                />
-              </div>
-            )}
-
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
-                Email
+              <label htmlFor="account" className="block text-sm font-medium text-gray-700 mb-2">
+                Account
               </label>
               <input
-                id="email"
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
+                id="account"
+                type="text"
+                value={account}
+                onChange={(e) => setAccount(e.target.value)}
                 required
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
-                placeholder="your.email@example.com"
+                placeholder="Enter your account name or number"
               />
             </div>
 
             <div>
               <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
-                Password
+                Password {isRegister && <span className="text-gray-400 text-xs">(min 6 characters)</span>}
               </label>
               <input
                 id="password"
@@ -147,10 +130,28 @@ export default function LoginForm() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 required
+                minLength={6}
                 className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
                 placeholder="Enter your password"
               />
             </div>
+
+            {isRegister && (
+              <div>
+                <label htmlFor="registrationCode" className="block text-sm font-medium text-gray-700 mb-2">
+                  Registration Code
+                </label>
+                <input
+                  id="registrationCode"
+                  type="text"
+                  value={registrationCode}
+                  onChange={(e) => setRegistrationCode(e.target.value)}
+                  required
+                  className="w-full px-4 py-3 bg-white border border-gray-200 rounded-xl focus:border-black focus:ring-2 focus:ring-black/5 transition-all outline-none text-gray-900 placeholder-gray-400"
+                  placeholder="Enter registration code"
+                />
+              </div>
+            )}
 
             <button
               type="submit"
