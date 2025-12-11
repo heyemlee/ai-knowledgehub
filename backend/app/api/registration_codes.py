@@ -54,7 +54,8 @@ async def create_registration_code(
     new_code = RegistrationCode(
         code=code_data.code,
         description=code_data.description,
-        max_uses=code_data.max_uses,
+        token_quota=code_data.token_quota,
+        tokens_per_registration=code_data.tokens_per_registration,
         created_by=current_user.get("user_id")
     )
     
@@ -91,8 +92,8 @@ async def update_registration_code(
         code.description = code_data.description
     if code_data.is_active is not None:
         code.is_active = code_data.is_active
-    if code_data.max_uses is not None:
-        code.max_uses = code_data.max_uses
+    if code_data.token_quota is not None:
+        code.token_quota = code_data.token_quota
     
     await db.commit()
     await db.refresh(code)
