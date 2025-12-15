@@ -24,7 +24,7 @@ class UserLogin(BaseModel):
         """验证并清理账号"""
         if not v or len(v.strip()) == 0:
             raise ValueError("账号不能为空")
-        return v.strip()
+        return v.strip().lower()  # 统一转换为小写
     
     @field_validator('password')
     @classmethod
@@ -50,7 +50,7 @@ class UserCreate(BaseModel):
         """验证并清理账号"""
         if not v or len(v.strip()) == 0:
             raise ValueError("账号不能为空")
-        return v.strip()
+        return v.strip().lower()  # 统一转换为小写
     
     @field_validator('password')
     @classmethod
