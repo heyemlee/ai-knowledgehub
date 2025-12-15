@@ -33,7 +33,7 @@ async def lifespan(app: FastAPI):
     try:
         from app.db.migrations import run_migrations
         logger.info("Running database migrations...")
-        run_migrations()
+        await run_migrations()
         logger.info("Database migrations completed successfully")
     except Exception as e:
         logger.error(f"Database migration failed: {e}")
