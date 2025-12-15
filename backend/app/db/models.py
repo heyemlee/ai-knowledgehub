@@ -88,7 +88,7 @@ class TokenUsage(Base):
     __tablename__ = "token_usage"
     
     id = Column(Integer, primary_key=True, index=True)
-    user_id = Column(Integer, ForeignKey("users.id"), nullable=False, index=True)
+    user_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True)
     usage_date = Column(DateTime(timezone=True), nullable=False, index=True)  # 使用日期（用于按日统计）
     prompt_tokens = Column(Integer, default=0, nullable=False)  # 输入 token 数
     completion_tokens = Column(Integer, default=0, nullable=False)  # 输出 token 数
@@ -96,7 +96,7 @@ class TokenUsage(Base):
     endpoint = Column(String(100), nullable=True)  # 使用的端点（如 chat/ask, chat/stream）
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     
-    # 关系（可选，用于级联删除）
+    # 关系（级联删除）
     user = relationship("User", backref="token_usage_records")
 
 
@@ -146,10 +146,9 @@ class RegistrationCode(Base):
     token_quota = Column(Integer, nullable=True)  # Token 配额（None 表示无限制）
     tokens_used = Column(Integer, default=0, nullable=False)  # 已使用的 tokens
     tokens_per_registration = Column(Integer, default=800000, nullable=False)  # 每次注册分配的 tokens (月度配额: 400问题 × 2000 tokens)
-    created_by = Column(Integer, ForeignKey("users.id"), nullable=False)  # 创建者
+    created_by = Column(Integer, ForeignKey("users.id", ondelete="SET NULL"), nullable=True)  # 创建者（删除用户时设为 NULL）
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     # 关系
     creator = relationship("User", backref="registration_codes")
-
