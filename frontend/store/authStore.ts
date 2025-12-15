@@ -28,7 +28,7 @@ export const useAuthStore = create<AuthState>((set) => ({
 
   login: async (account: string, password: string) => {
     try {
-      const response = await authAPI.login({ email: account, password })
+      const response = await authAPI.login({ account, password })
       localStorage.setItem('access_token', response.access_token)
 
       // 获取用户信息

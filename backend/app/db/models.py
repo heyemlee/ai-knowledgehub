@@ -27,11 +27,13 @@ class User(Base):
     full_name = Column(String(255), nullable=True)
     is_active = Column(Boolean, default=True, nullable=False)
     role = Column(String(20), default="user", nullable=False)  # user | admin
+    token_quota = Column(Integer, default=800000, nullable=False)  # 用户的 Token 配额，默认 80万
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     
     documents = relationship("Document", back_populates="owner", cascade="all, delete-orphan")
     conversations = relationship("Conversation", back_populates="owner", cascade="all, delete-orphan")
+
 
 
 class Document(Base):

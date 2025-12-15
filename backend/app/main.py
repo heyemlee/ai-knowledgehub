@@ -26,8 +26,22 @@ logger = logging.getLogger(__name__)
 # ==============================
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # 初始化数据库
     await init_db()
+    
+    # 运行数据库迁移
+    try:
+        from app.db.migrations import run_migrations
+        logger.info("Running database migrations...")
+        run_migrations()
+        logger.info("Database migrations completed successfully")
+    except Exception as e:
+        logger.error(f"Database migration failed: {e}")
+        # 不阻止应用启动，因为迁移可能已经运行过
+    
+    # 创建管理员用户
     await create_admin_user()
+    
     yield
     await close_db()
 
