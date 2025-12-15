@@ -15,6 +15,9 @@ async def run_migrations():
     try:
         logger.info("Starting database migrations...")
         
+        # 迁移 0: 清理孤立的 token_usage 记录
+        await cleanup_orphaned_token_usage()
+        
         # 迁移 1: 添加 token_quota 字段
         await migrate_add_token_quota()
         
@@ -24,6 +27,39 @@ async def run_migrations():
         logger.error(f"Migration error: {e}", exc_info=True)
         # 不抛出异常，避免阻止应用启动
         logger.warning("Migration failed, but application will continue to start")
+
+
+async def cleanup_orphaned_token_usage():
+    """清理孤立的 token_usage 记录（user_id 为 NULL）"""
+    try:
+        async with engine.begin() as conn:
+            # 查询孤立记录数量
+            count_query = text("""
+                SELECT COUNT(*) 
+                FROM token_usage 
+                WHERE user_id IS NULL
+            """)
+            result = await conn.execute(count_query)
+            orphaned_count = result.scalar()
+            
+            if orphaned_count == 0:
+                logger.info("✓ No orphaned token_usage records found")
+                return
+            
+            logger.info(f"Found {orphaned_count} orphaned token_usage records, cleaning up...")
+            
+            # 删除孤立记录
+            delete_query = text("""
+                DELETE FROM token_usage 
+                WHERE user_id IS NULL
+            """)
+            await conn.execute(delete_query)
+            
+            logger.info(f"✓ Successfully deleted {orphaned_count} orphaned token_usage records")
+            
+    except Exception as e:
+        logger.warning(f"Failed to cleanup orphaned records: {e}")
+        # 不抛出异常，继续执行其他迁移
 
 
 async def migrate_add_token_quota():
