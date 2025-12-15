@@ -7,7 +7,7 @@ from sqlalchemy import select, func, desc
 from app.utils.auth import get_current_admin
 from app.db.database import get_db
 from app.db.models import Document, User
-from app.models.schemas import DocumentMetadata, UserResponse
+from app.models.schemas import DocumentMetadata, UserResponse, UserQuotaUpdate
 from app.middleware.rate_limit import limiter
 from app.core.constants import RateLimitConfig
 from typing import List
@@ -133,6 +133,7 @@ async def list_all_users(
                 full_name=user.full_name,
                 is_active=user.is_active,
                 role=user.role,
+                token_quota=user.token_quota,
                 created_at=user.created_at
             )
             for user in users
@@ -236,3 +237,186 @@ async def admin_delete_document(
         logger.error(f"管理员删除文档失败: {e}", exc_info=True)
         raise HTTPException(status_code=500, detail=f"删除失败: {str(e)}")
 
+
+@router.get("/users/{user_id}/detail")
+@limiter.limit(RateLimitConfig.DOCUMENT_RATE_LIMIT)
+async def get_user_detail(
+    request: Request,
+    user_id: int,
+    current_admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    管理员查看用户详情（包含 Token 使用情况）
+    """
+    try:
+        from app.db.models import TokenUsage
+        from app.models.schemas import AdminUserDetailResponse
+        
+        # 查询用户
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        # 计算用户已使用的 tokens
+        tokens_used_result = await db.execute(
+            select(func.sum(TokenUsage.total_tokens))
+            .where(TokenUsage.user_id == user_id)
+        )
+        tokens_used = tokens_used_result.scalar() or 0
+        
+        # 计算剩余 tokens
+        tokens_remaining = max(0, user.token_quota - tokens_used)
+        
+        return AdminUserDetailResponse(
+            id=user.id,
+            email=user.email,
+            full_name=user.full_name,
+            is_active=user.is_active,
+            role=user.role,
+            token_quota=user.token_quota,
+            tokens_used=tokens_used,
+            tokens_remaining=tokens_remaining,
+            created_at=user.created_at
+        )
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"获取用户详情失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取用户详情失败: {str(e)}")
+
+
+@router.delete("/users/{user_id}")
+@limiter.limit(RateLimitConfig.DOCUMENT_RATE_LIMIT)
+async def delete_user(
+    request: Request,
+    user_id: int,
+    current_admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    管理员删除用户账号
+    
+    注意：会级联删除用户的所有文档、对话、Token 使用记录等
+    """
+    try:
+        # 查询用户
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        # 不允许删除管理员自己
+        if user_id == current_admin.get('user_id'):
+            raise HTTPException(status_code=400, detail="不能删除自己的账号")
+        
+        # 删除用户（会级联删除关联数据）
+        await db.delete(user)
+        await db.commit()
+        
+        logger.info(f"管理员 {current_admin.get('user_id')} 成功删除用户 {user_id} ({user.email})")
+        return {"message": "用户删除成功", "user_id": user_id, "email": user.email}
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"删除用户失败: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"删除用户失败: {str(e)}")
+
+
+@router.patch("/users/{user_id}/quota")
+@limiter.limit(RateLimitConfig.DOCUMENT_RATE_LIMIT)
+async def update_user_quota(
+    request: Request,
+    user_id: int,
+    quota_update: UserQuotaUpdate,
+    current_admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    管理员更新用户的 Token 配额
+    """
+    try:
+        # 查询用户
+        result = await db.execute(select(User).where(User.id == user_id))
+        user = result.scalar_one_or_none()
+        
+        if not user:
+            raise HTTPException(status_code=404, detail="用户不存在")
+        
+        # 更新配额
+        old_quota = user.token_quota
+        user.token_quota = quota_update.token_quota
+        
+        await db.commit()
+        await db.refresh(user)
+        
+        logger.info(f"管理员 {current_admin.get('user_id')} 更新用户 {user_id} 的 Token 配额: {old_quota} -> {quota_update.token_quota}")
+        
+        return {
+            "message": "Token 配额更新成功",
+            "user_id": user_id,
+            "email": user.email,
+            "old_quota": old_quota,
+            "new_quota": user.token_quota
+        }
+        
+    except HTTPException:
+        raise
+    except Exception as e:
+        logger.error(f"更新用户配额失败: {e}", exc_info=True)
+        await db.rollback()
+        raise HTTPException(status_code=500, detail=f"更新配额失败: {str(e)}")
+
+
+@router.get("/users/tokens/summary")
+@limiter.limit(RateLimitConfig.DOCUMENT_RATE_LIMIT)
+async def get_users_token_summary(
+    request: Request,
+    current_admin: dict = Depends(get_current_admin),
+    db: AsyncSession = Depends(get_db)
+):
+    """
+    获取所有用户的 Token 使用汇总
+    """
+    try:
+        from app.db.models import TokenUsage
+        
+        # 获取所有用户
+        users_result = await db.execute(select(User))
+        users = users_result.scalars().all()
+        
+        summary = []
+        for user in users:
+            # 计算用户已使用的 tokens
+            tokens_used_result = await db.execute(
+                select(func.sum(TokenUsage.total_tokens))
+                .where(TokenUsage.user_id == user.id)
+            )
+            tokens_used = tokens_used_result.scalar() or 0
+            tokens_remaining = max(0, user.token_quota - tokens_used)
+            
+            summary.append({
+                "user_id": user.id,
+                "email": user.email,
+                "role": user.role,
+                "is_active": user.is_active,
+                "token_quota": user.token_quota,
+                "tokens_used": tokens_used,
+                "tokens_remaining": tokens_remaining,
+                "usage_percentage": round((tokens_used / user.token_quota * 100) if user.token_quota > 0 else 0, 2)
+            })
+        
+        return {
+            "total_users": len(summary),
+            "users": summary
+        }
+        
+    except Exception as e:
+        logger.error(f"获取 Token 使用汇总失败: {e}", exc_info=True)
+        raise HTTPException(status_code=500, detail=f"获取汇总失败: {str(e)}")

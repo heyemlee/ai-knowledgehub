@@ -3,7 +3,7 @@
 import { useEffect, useState } from 'react'
 import { adminApi, AdminDocument, AdminUser, DocumentStats, UserStats, registrationCodeApi, RegistrationCode, RegistrationCodeCreate } from '@/lib/adminApi'
 import { documentsAPI } from '@/lib/api'
-import { X, Upload, Trash2, Users, FileText, Download, Image, Key, Plus, Edit2 } from 'lucide-react'
+import { X, Upload, Trash2, Users, FileText, Download, Image, Key, Plus, Edit2, TrendingUp } from 'lucide-react'
 import { toast } from './Toast'
 import { confirm } from './ConfirmDialog'
 import ImageManagement from './ImageManagement'
@@ -33,6 +33,12 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
   const [newCode, setNewCode] = useState('')
   const [newCodeDescription, setNewCodeDescription] = useState('')
   const [newTokenQuota, setNewTokenQuota] = useState<string>('8000000')  // Token 配额，默认 8M (10 用户)
+
+  // User management modal states
+  const [showEditQuotaModal, setShowEditQuotaModal] = useState(false)
+  const [selectedUser, setSelectedUser] = useState<AdminUser | null>(null)
+  const [editQuotaValue, setEditQuotaValue] = useState<string>('')
+  const [userTokenSummary, setUserTokenSummary] = useState<any>(null)
 
   const formatLosAngelesDate = (dateString: string) => {
     const date = new Date(dateString)
@@ -132,15 +138,67 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
 
   const loadUsers = async () => {
     try {
-      const [userList, stats] = await Promise.all([
+      const [userList, stats, tokenSummary] = await Promise.all([
         adminApi.getAllUsers(),
-        adminApi.getUserStats()
+        adminApi.getUserStats(),
+        adminApi.getUsersTokenSummary()
       ])
       setUsers(userList)
       setUserStats(stats)
+      setUserTokenSummary(tokenSummary)
     } catch (error: any) {
       console.error('Failed to load users:', error)
       toast.error('Failed to load data')
+    }
+  }
+
+  const handleDeleteUser = async (userId: number, email: string) => {
+    const confirmed = await confirm(
+      `Are you sure you want to delete user "${email}"?\n\nThis will permanently delete:\n- User account\n- All documents\n- All conversations\n- Token usage records\n\nThis action cannot be undone!`,
+      {
+        title: 'Delete User',
+        confirmText: 'Delete',
+        cancelText: 'Cancel',
+      }
+    )
+
+    if (!confirmed) return
+
+    try {
+      await adminApi.deleteUser(userId)
+      toast.success('User deleted successfully')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Failed to delete user:', error)
+      toast.error(error.response?.data?.detail || 'Failed to delete user')
+    }
+  }
+
+  const handleEditQuota = (user: AdminUser) => {
+    setSelectedUser(user)
+    setEditQuotaValue(user.token_quota.toString())
+    setShowEditQuotaModal(true)
+  }
+
+  const handleUpdateQuota = async () => {
+    if (!selectedUser) return
+
+    const newQuota = parseInt(editQuotaValue)
+    if (isNaN(newQuota) || newQuota < 0) {
+      toast.error('Invalid quota value')
+      return
+    }
+
+    try {
+      await adminApi.updateUserQuota(selectedUser.id, newQuota)
+      toast.success('Token quota updated successfully')
+      setShowEditQuotaModal(false)
+      setSelectedUser(null)
+      setEditQuotaValue('')
+      await loadUsers()
+    } catch (error: any) {
+      console.error('Failed to update quota:', error)
+      toast.error(error.response?.data?.detail || 'Failed to update quota')
     }
   }
 
@@ -454,7 +512,7 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                 <ImageManagement isOpen={activeTab === 'images'} />
               )}
 
-              {activeTab === 'users' && (
+              {activeTab === 'users' && userTokenSummary && (
                 <div>
                   <div className="mb-6">
                     <p className="text-sm text-gray-600">Total {users.length} users</p>
@@ -466,39 +524,85 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Account</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Role</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Status</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Token Usage</th>
                           <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Created At</th>
+                          <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 uppercase">Actions</th>
                         </tr>
                       </thead>
                       <tbody>
-                        {users.map((user) => (
-                          <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
-                            <td className="px-4 py-3">
-                              <div className="font-medium text-gray-900">{user.email}</div>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 text-xs rounded-full ${user.role === 'admin'
-                                ? 'bg-purple-100 text-purple-800'
-                                : 'bg-gray-100 text-gray-800'
-                                }`}>
-                                {user.role === 'admin' ? 'Admin' : 'User'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3">
-                              <span className={`px-2 py-1 text-xs rounded-full ${user.is_active
-                                ? 'bg-green-100 text-green-800'
-                                : 'bg-red-100 text-red-800'
-                                }`}>
-                                {user.is_active ? 'Active' : 'Inactive'}
-                              </span>
-                            </td>
-                            <td className="px-4 py-3 text-gray-600">{formatLosAngelesDate(user.created_at)}</td>
-                          </tr>
-                        ))}
+                        {users.map((user) => {
+                          const tokenInfo = userTokenSummary.users.find((u: any) => u.user_id === user.id)
+                          const usagePercentage = tokenInfo?.usage_percentage || 0
+
+                          return (
+                            <tr key={user.id} className="border-b border-gray-100 hover:bg-gray-50">
+                              <td className="px-4 py-3">
+                                <div className="font-medium text-gray-900">{user.email}</div>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 text-xs rounded-full ${user.role === 'admin'
+                                  ? 'bg-purple-100 text-purple-800'
+                                  : 'bg-gray-100 text-gray-800'
+                                  }`}>
+                                  {user.role === 'admin' ? 'Admin' : 'User'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <span className={`px-2 py-1 text-xs rounded-full ${user.is_active
+                                  ? 'bg-green-100 text-green-800'
+                                  : 'bg-red-100 text-red-800'
+                                  }`}>
+                                  {user.is_active ? 'Active' : 'Inactive'}
+                                </span>
+                              </td>
+                              <td className="px-4 py-3">
+                                <div className="flex flex-col gap-1 min-w-[200px]">
+                                  <div className="flex items-center justify-between text-xs text-gray-600">
+                                    <span>{tokenInfo?.tokens_used?.toLocaleString() || 0} / {user.token_quota.toLocaleString()}</span>
+                                    <span className="font-medium">{usagePercentage.toFixed(1)}%</span>
+                                  </div>
+                                  <div className="w-full bg-gray-200 rounded-full h-2">
+                                    <div
+                                      className={`h-2 rounded-full transition-all ${usagePercentage >= 90
+                                        ? 'bg-red-500'
+                                        : usagePercentage >= 70
+                                          ? 'bg-yellow-500'
+                                          : 'bg-green-500'
+                                        }`}
+                                      style={{ width: `${Math.min(usagePercentage, 100)}%` }}
+                                    />
+                                  </div>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 text-gray-600">{formatLosAngelesDate(user.created_at)}</td>
+                              <td className="px-4 py-3">
+                                <div className="flex space-x-2">
+                                  <button
+                                    onClick={() => handleEditQuota(user)}
+                                    className="p-1 text-blue-600 hover:bg-blue-50 rounded"
+                                    title="Edit Token Quota"
+                                  >
+                                    <Edit2 className="w-4 h-4" />
+                                  </button>
+                                  <button
+                                    onClick={() => handleDeleteUser(user.id, user.email)}
+                                    className="p-1 text-red-600 hover:bg-red-50 rounded"
+                                    title="Delete User"
+                                    disabled={user.role === 'admin'}
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          )
+                        })}
                       </tbody>
                     </table>
                   </div>
                 </div>
               )}
+
 
               {activeTab === 'registration-codes' && (
                 <div>
@@ -643,6 +747,59 @@ export default function AdminPanel({ isOpen, onClose }: AdminPanelProps) {
                 className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
               >
                 Create
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Edit Quota Modal */}
+      {showEditQuotaModal && selectedUser && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-lg shadow-xl max-w-md w-full p-6">
+            <h3 className="text-xl font-bold text-black mb-4">Edit Token Quota</h3>
+            <div className="mb-4">
+              <p className="text-sm text-gray-600 mb-2">
+                User: <span className="font-medium text-gray-900">{selectedUser.email}</span>
+              </p>
+              <p className="text-sm text-gray-600">
+                Current Quota: <span className="font-medium text-gray-900">{selectedUser.token_quota.toLocaleString()} tokens</span>
+              </p>
+            </div>
+            <div className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  New Token Quota *
+                  <span className="block text-xs text-gray-500 font-normal mt-1">
+                    Default: 800,000 tokens/month (≈400 questions)
+                  </span>
+                </label>
+                <input
+                  type="number"
+                  value={editQuotaValue}
+                  onChange={(e) => setEditQuotaValue(e.target.value)}
+                  className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500"
+                  placeholder="Enter new token quota"
+                  min="0"
+                />
+              </div>
+            </div>
+            <div className="flex justify-end gap-3 mt-6">
+              <button
+                onClick={() => {
+                  setShowEditQuotaModal(false)
+                  setSelectedUser(null)
+                  setEditQuotaValue('')
+                }}
+                className="px-4 py-2 text-gray-700 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors"
+              >
+                Cancel
+              </button>
+              <button
+                onClick={handleUpdateQuota}
+                className="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors"
+              >
+                Update
               </button>
             </div>
           </div>

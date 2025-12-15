@@ -15,14 +15,16 @@ class Token(BaseModel):
 
 class UserLogin(BaseModel):
     """用户登录请求"""
-    email: EmailStr = Field(..., min_length=1, max_length=255)
+    account: str = Field(..., min_length=1, max_length=255)  # 改为 account，支持任意账号
     password: str = Field(..., min_length=1, max_length=128)
     
-    @field_validator('email')
+    @field_validator('account')
     @classmethod
-    def validate_email(cls, v):
-        """验证并清理邮箱"""
-        return InputSanitizer.sanitize_email(v)
+    def validate_account(cls, v):
+        """验证并清理账号"""
+        if not v or len(v.strip()) == 0:
+            raise ValueError("账号不能为空")
+        return v.strip()
     
     @field_validator('password')
     @classmethod
@@ -78,6 +80,7 @@ class UserResponse(BaseModel):
     full_name: Optional[str] = None
     is_active: bool = True
     role: str = "user"
+    token_quota: int = 800000  # Token 配额
     created_at: Optional[datetime] = None  # 允许为 None，简化开发
 
     class Config:
@@ -318,3 +321,27 @@ class RegistrationCodeResponse(BaseModel):
     class Config:
         from_attributes = True
 
+
+# ==============================
+# 管理员用户管理相关 Schemas
+# ==============================
+
+class AdminUserDetailResponse(BaseModel):
+    """管理员查看用户详情响应（包含 Token 使用情况）"""
+    id: int
+    email: str
+    full_name: Optional[str] = None
+    is_active: bool = True
+    role: str = "user"
+    token_quota: int = 800000  # Token 配额
+    tokens_used: int = 0  # 已使用的 tokens
+    tokens_remaining: int = 800000  # 剩余 tokens
+    created_at: Optional[datetime] = None
+
+    class Config:
+        from_attributes = True
+
+
+class UserQuotaUpdate(BaseModel):
+    """更新用户 Token 配额请求"""
+    token_quota: int = Field(..., ge=0, description="新的 Token 配额")

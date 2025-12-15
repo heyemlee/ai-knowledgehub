@@ -10,7 +10,7 @@ import UserProfile from './UserProfile'
 import AdminPanel from './AdminPanel'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
-import { Send, LogOut, User, Settings, Menu } from 'lucide-react'
+import { Send, LogOut, User, Settings, Menu, Copy, Check, Download } from 'lucide-react'
 import { toast } from './Toast'
 
 export default function ChatInterface() {
@@ -30,6 +30,7 @@ export default function ChatInterface() {
   const [showProfile, setShowProfile] = useState(false)
   const [showAdmin, setShowAdmin] = useState(false)
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false)
+  const [copiedIndex, setCopiedIndex] = useState<number | null>(null)
   const messagesEndRef = useRef<HTMLDivElement>(null)
   const { logout, user } = useAuthStore()
   const router = useRouter()
@@ -160,6 +161,49 @@ export default function ChatInterface() {
     }
   }
 
+  const handleCopyMessage = async (content: string, index: number) => {
+    try {
+      await navigator.clipboard.writeText(content)
+      setCopiedIndex(index)
+      toast.success('Copied to clipboard')
+      setTimeout(() => setCopiedIndex(null), 2000)
+    } catch (error) {
+      console.error('Failed to copy:', error)
+      toast.error('Failed to copy')
+    }
+  }
+
+  const handleDownloadImage = async (imageId: number, filename: string) => {
+    try {
+      const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000'
+      const imageUrl = `${API_URL}/api/v1/images/${imageId}/file`
+
+      // 下载图片
+      const response = await fetch(imageUrl, {
+        headers: {
+          'Authorization': `Bearer ${localStorage.getItem('access_token')}`
+        }
+      })
+
+      if (!response.ok) throw new Error('Download failed')
+
+      const blob = await response.blob()
+      const url = window.URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = filename || `image_${imageId}.jpg`
+      document.body.appendChild(a)
+      a.click()
+      window.URL.revokeObjectURL(url)
+      document.body.removeChild(a)
+
+      toast.success('Image downloaded')
+    } catch (error) {
+      console.error('Failed to download image:', error)
+      toast.error('Failed to download image')
+    }
+  }
+
   return (
     <div className="fixed inset-0 flex bg-white overflow-hidden">
       {/* 对话历史侧边栏 */}
@@ -247,10 +291,23 @@ export default function ChatInterface() {
                 {msg.role === 'user' ? (
                   <p className="whitespace-pre-wrap leading-relaxed text-[15px]">{msg.content}</p>
                 ) : (
-                  <>
+                  <div className="relative group">
                     <div className="prose prose-sm max-w-none prose-headings:text-gray-900 prose-p:text-gray-900 prose-strong:text-gray-900 prose-li:text-gray-900">
                       <ReactMarkdown remarkPlugins={[remarkGfm]}>{msg.content}</ReactMarkdown>
                     </div>
+
+                    {/* 复制按钮 */}
+                    <button
+                      onClick={() => handleCopyMessage(msg.content, idx)}
+                      className="absolute -top-2 -right-2 p-2 bg-white border border-gray-200 rounded-lg opacity-0 group-hover:opacity-100 hover:bg-gray-50 transition-all shadow-sm"
+                      title="Copy message"
+                    >
+                      {copiedIndex === idx ? (
+                        <Check size={16} className="text-green-600" />
+                      ) : (
+                        <Copy size={16} className="text-gray-600" />
+                      )}
+                    </button>
 
                     {/* 显示图片 */}
                     {msg.images && msg.images.length > 0 && (
@@ -262,17 +319,27 @@ export default function ChatInterface() {
                             const imageUrl = `${API_URL}/api/v1/images/${image.id}/file`
 
                             return (
-                              <div key={imgIdx} className="group relative rounded-lg border border-gray-200 hover:border-gray-400 transition-all overflow-hidden bg-gray-50">
+                              <div key={imgIdx} className="group/image relative rounded-lg border border-gray-200 hover:border-gray-400 transition-all overflow-hidden bg-gray-50">
                                 {/* eslint-disable-next-line @next/next/no-img-element */}
                                 <img
                                   src={imageUrl}
                                   alt={image.description || 'Related Image'}
-                                  className="max-w-full max-h-96 object-contain cursor-pointer group-hover:opacity-90 transition-opacity"
+                                  className="max-w-full max-h-96 object-contain cursor-pointer group-hover/image:opacity-90 transition-opacity"
                                   onClick={() => window.open(imageUrl, '_blank')}
                                   loading="lazy"
                                 />
+
+                                {/* 下载按钮 */}
+                                <button
+                                  onClick={() => handleDownloadImage(image.id, image.filename || image.original_filename)}
+                                  className="absolute top-2 right-2 p-2 bg-white/90 backdrop-blur-sm border border-gray-200 rounded-lg opacity-0 group-hover/image:opacity-100 hover:bg-white transition-all shadow-sm"
+                                  title="Download image"
+                                >
+                                  <Download size={16} className="text-gray-600" />
+                                </button>
+
                                 {image.description && (
-                                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent text-white text-xs p-3 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/80 to-transparent text-white text-xs p-3 opacity-0 group-hover/image:opacity-100 transition-opacity">
                                     <p className="line-clamp-2">{image.description}</p>
                                   </div>
                                 )}
@@ -282,7 +349,7 @@ export default function ChatInterface() {
                         </div>
                       </div>
                     )}
-                  </>
+                  </div>
                 )}
               </div>
             </div>

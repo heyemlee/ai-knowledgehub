@@ -32,9 +32,9 @@ def get_password_hash(password: str) -> str:
     return pwd_context.hash(password)
 
 
-async def get_user_by_email(db: AsyncSession, email: str) -> User | None:
-    """从数据库获取用户"""
-    result = await db.execute(select(User).where(User.email == email))
+async def get_user_by_account(db: AsyncSession, account: str) -> User | None:
+    """从数据库获取用户（通过账号）"""
+    result = await db.execute(select(User).where(User.email == account))
     return result.scalar_one_or_none()
 
 
@@ -51,12 +51,12 @@ async def login(
     Returns:
         JWT Token
     """
-    user = await get_user_by_email(db, user_credentials.email)
+    user = await get_user_by_account(db, user_credentials.account)
     
     if not user or not verify_password(user_credentials.password, user.hashed_password):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="邮箱或密码错误",
+            detail="账号或密码错误",
             headers={"WWW-Authenticate": "Bearer"},
         )
     
@@ -117,7 +117,7 @@ async def register(
             )
     
     # 检查用户是否已存在
-    existing_user = await get_user_by_email(db, user_data.account)
+    existing_user = await get_user_by_account(db, user_data.account)
     if existing_user:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -129,7 +129,8 @@ async def register(
         email=user_data.account,  # 使用 account 字段作为 email
         hashed_password=get_password_hash(user_data.password),
         full_name=None,  # 不再使用 full_name
-        is_active=True
+        is_active=True,
+        token_quota=reg_code.tokens_per_registration  # 设置用户的初始 Token 配额
     )
     
     db.add(new_user)
@@ -146,6 +147,7 @@ async def register(
         full_name=new_user.full_name,
         is_active=new_user.is_active,
         role=new_user.role,
+        token_quota=new_user.token_quota,
         created_at=new_user.created_at
     )
 
@@ -158,8 +160,8 @@ async def get_current_user_info(
     """
     获取当前用户信息
     """
-    email = current_user.get("sub")
-    user = await get_user_by_email(db, email)
+    account = current_user.get("sub")
+    user = await get_user_by_account(db, account)
     
     if not user:
         raise HTTPException(
@@ -173,6 +175,7 @@ async def get_current_user_info(
         full_name=user.full_name,
         is_active=user.is_active,
         role=user.role,
+        token_quota=user.token_quota,
         created_at=user.created_at
     )
 

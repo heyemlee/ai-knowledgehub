@@ -58,8 +58,38 @@ export interface AdminUser {
   full_name: string | null
   is_active: boolean
   role: string
+  token_quota: number
   created_at: string
 }
+
+export interface AdminUserDetail {
+  id: number
+  email: string
+  full_name: string | null
+  is_active: boolean
+  role: string
+  token_quota: number
+  tokens_used: number
+  tokens_remaining: number
+  created_at: string
+}
+
+export interface UserTokenSummary {
+  user_id: number
+  email: string
+  role: string
+  is_active: boolean
+  token_quota: number
+  tokens_used: number
+  tokens_remaining: number
+  usage_percentage: number
+}
+
+export interface UserTokensSummaryResponse {
+  total_users: number
+  users: UserTokenSummary[]
+}
+
 
 export interface DocumentStats {
   total_documents: number
@@ -108,6 +138,28 @@ export const adminApi = {
   // 获取用户统计
   getUserStats: async (): Promise<UserStats> => {
     const response = await adminClient.get('/users/stats')
+    return response.data
+  },
+
+  // 获取用户详情（包含 Token 使用情况）
+  getUserDetail: async (userId: number): Promise<AdminUserDetail> => {
+    const response = await adminClient.get(`/users/${userId}/detail`)
+    return response.data
+  },
+
+  // 删除用户
+  deleteUser: async (userId: number): Promise<void> => {
+    await adminClient.delete(`/users/${userId}`)
+  },
+
+  // 更新用户 Token 配额
+  updateUserQuota: async (userId: number, tokenQuota: number): Promise<void> => {
+    await adminClient.patch(`/users/${userId}/quota`, { token_quota: tokenQuota })
+  },
+
+  // 获取所有用户的 Token 使用汇总
+  getUsersTokenSummary: async (): Promise<UserTokensSummaryResponse> => {
+    const response = await adminClient.get('/users/tokens/summary')
     return response.data
   },
 }
