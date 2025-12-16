@@ -134,28 +134,29 @@ async def stream_answer(
         except Exception as e:
             logger.warning(f"向量检索失败: {e}")
         
+        
         full_answer = ""
         sources = []
         images = []  # 新增：相关图片列表
         token_usage = None
         
+        # 提前检索相关图片（在生成答案之前）
+        try:
+            images = await image_retrieval_service.search_images(
+                db=db,
+                question=chat_request.question,
+                limit=3
+            )
+            logger.info(f"检索到 {len(images)} 张相关图片")
+        except Exception as e:
+            logger.warning(f"图片检索失败: {e}")
+            images = []
+        
         
         async def generate():
-            nonlocal full_answer, token_usage, images
+            nonlocal full_answer, token_usage
             
             if not relevant_docs:
-                # 即使没有文档，也尝试检索图片
-                try:
-                    images = await image_retrieval_service.search_images(
-                        db=db,
-                        question=chat_request.question,
-                        limit=3
-                    )
-                    logger.info(f"没有文档，但检索到 {len(images)} 张相关图片")
-                except Exception as e:
-                    logger.warning(f"图片检索失败: {e}")
-                    images = []
-                
                 # 自动检测问题语言，返回对应语言的提示
                 question_language = detect_language(chat_request.question)
                 logger.info(f"检测到问题语言: {question_language}")
@@ -180,7 +181,8 @@ async def stream_answer(
                     question=chat_request.question,
                     context=relevant_docs,
                     temperature=chat_request.temperature or AIConfig.DEFAULT_TEMPERATURE,
-                    max_tokens=chat_request.max_tokens or AIConfig.DEFAULT_MAX_TOKENS
+                    max_tokens=chat_request.max_tokens or AIConfig.DEFAULT_MAX_TOKENS,
+                    has_images=len(images) > 0  # 告知AI是否有图片
                 )
                 
                 async for chunk_data in stream_gen:
@@ -218,18 +220,6 @@ async def stream_answer(
                         "content": doc["content"][:200] + "..." if len(doc["content"]) > 200 else doc["content"],
                         "metadata": metadata
                     })
-            
-            # 检索相关图片
-            try:
-                images = await image_retrieval_service.search_images(
-                    db=db,
-                    question=chat_request.question,
-                    limit=3
-                )
-                logger.info(f"检索到 {len(images)} 张相关图片")
-            except Exception as e:
-                logger.warning(f"图片检索失败: {e}")
-                images = []
             
             yield f"data: {json.dumps({'content': '', 'done': True, 'sources': sources, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
 
