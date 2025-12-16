@@ -65,7 +65,8 @@ Return only keywords, no other explanation:"""
    - 关键词后面的内容（如"关键词: 内容"格式中的内容部分）
    - 冒号、分号、逗号分隔的信息
    - 任何与问题相关的片段
-6. 只有在**完全确认**文档中真的没有任何相关信息时，才说"未找到相关信息"
+6. 只有在**完全确认**文档中真的没有任何相关信息**且没有提供相关图片**时，才说"未找到相关信息"
+   - **重要**：如果系统提供了相关图片，即使文档信息不足，也不要说"未找到相关信息"
 7. 回答要**直接、具体**，不要过度谨慎，不要添加"根据文档"、"文档中提到"等前缀
 8. **如果文档中有"关键词: 内容"的格式，直接提取冒号后的内容作为答案**
 9. **必须使用中文回答中文问题**，使用英文回答英文问题
@@ -114,7 +115,8 @@ Return only keywords, no other explanation:"""
    - Content following keywords (e.g., content parts in "keyword: content" format)
    - Information separated by colons, semicolons, commas
    - Any fragments related to the question
-6. Only say "no relevant information found" when **completely confirmed** that there is really no relevant information in the documents
+6. Only say "no relevant information found" when **completely confirmed** that there is really no relevant information in the documents **and no related images are provided**
+   - **Important**: If the system provides related images, even if document information is insufficient, do not say "no relevant information found", instead acknowledge the provided images
 7. Answers should be **direct and specific**, not overly cautious, do not add prefixes like "according to the document", "the document mentions", etc.
 8. **If documents have "keyword: content" format, directly extract the content after the colon as the answer**
 9. **ABSOLUTELY MUST answer in English** - This is an English question, so your entire answer must be in English
@@ -139,7 +141,8 @@ Return only keywords, no other explanation:"""
         context_text: str, 
         context_count: int, 
         core_keywords: Optional[List[str]] = None,
-        language: Literal['zh', 'en'] = 'zh'
+        language: Literal['zh', 'en'] = 'zh',
+        has_images: bool = False
     ) -> str:
         """获取问答生成的 prompt"""
         keyword_hint = ""
@@ -170,7 +173,15 @@ Return only keywords, no other explanation:"""
             if language == 'zh':
                 keyword_hint = f"\n\n**特别注意：问题涉及「{keyword}」，请在文档中查找「{mapped_keyword}:」或「{mapped_keyword}：」后面的内容。如果文档中有「公司产品」相关信息，也要提取。**"
             else:
-                keyword_hint = f"\n\n**Special Note: The question involves「{keyword}」, please look for content after「{mapped_keyword}:」in the documents.**"
+                keyword_hint = f"\n\n**Special Note: The question involves「{keyword}」，please look for content after「{mapped_keyword}:」in the documents.**"
+        
+        # 添加图片提示
+        image_hint = ""
+        if has_images:
+            if language == 'zh':
+                image_hint = "\n\n**重要提示：系统已经为用户找到了相关图片。因此，即使文档信息不完整，也不要说\"未找到相关信息\"。用户将会看到相关图片。**"
+            else:
+                image_hint = "\n\n**Important Note: The system has found related images for the user. Therefore, even if document information is incomplete, do not say \"no relevant information found\". The user will see related images.**"
         
         if language == 'zh':
             return f"""**任务：从以下文档片段中提取信息回答用户问题**
@@ -178,7 +189,7 @@ Return only keywords, no other explanation:"""
 文档片段（共{context_count}个）：
 {context_text}
 
-**用户问题：{question}**{keyword_hint}
+**用户问题：{question}**{keyword_hint}{image_hint}
 
 **请执行以下步骤：**
 1. **理解问题的真实意图**：分析用户真正想知道什么
@@ -226,7 +237,7 @@ Return only keywords, no other explanation:"""
 - **理解问题的语义**：不要只做字面匹配，要理解用户真正想知道什么
 - 如果看到"关键词: 内容"这样的格式，内容就是答案，直接回答
 - 直接给出答案，不要添加"根据文档"、"文档中提到"等前缀
-- 如果找到了信息，直接回答；如果没有找到，才说"未找到相关信息"
+- 如果找到了信息或提供了相关图片，直接回答；只有在没有找到文档信息**且没有相关图片**时，才说\"未找到相关信息\"
 - 不要建议用户查看其他文档或咨询他人
 - **必须用中文回答**
 - **示例**：如果用户问"公司都有什么产品"，正确的回答是"橱柜，地板，玛瑙石"（或文档中的实际产品），错误的回答是"公司都有什么产品？"（重复问题）
@@ -238,7 +249,7 @@ Return only keywords, no other explanation:"""
 Document Fragments ({context_count} total):
 {context_text}
 
-**User Question: {question}**{keyword_hint}
+**User Question: {question}**{keyword_hint}{image_hint}
 
 **Please follow these steps:**
 1. **Understand the question intent**: Analyze what the user really wants to know
@@ -277,7 +288,7 @@ Document Fragments ({context_count} total):
 - **ABSOLUTELY PROHIBITED to repeat the question** - Your answer must be the actual answer, never repeat or echo the user's question
 - If you see "keyword: content" format, the content is the answer, answer directly
 - Give direct answers, do not add prefixes like "according to the document", "the document mentions", etc.
-- If information is found, answer directly; only say "no relevant information found" if not found
+- If information is found or related images are provided, answer directly; only say \"no relevant information found\" if no document information **and no related images** are found
 - Do not suggest users to view other documents or consult others
 - **Answer in English only - never use Chinese**
 - **Example**: If user asks "what products does the company have", correct answer is "cabinet, floor, agate stone" (or actual products from documents), wrong answer is "what products does the company have?" (repeating the question)
@@ -296,7 +307,8 @@ Now please answer directly in English without repeating the question:"""
         question: str, 
         context_text: str,
         core_keywords: Optional[List[str]] = None,
-        language: Literal['zh', 'en'] = 'zh'
+        language: Literal['zh', 'en'] = 'zh',
+        has_images: bool = False
     ) -> str:
         """获取流式问答的 prompt"""
         if language == 'zh':
@@ -312,6 +324,6 @@ Now please answer directly in English without repeating the question:"""
             context_text=context_text,
             context_count=context_count,
             core_keywords=core_keywords,
-            language=language
+            language=language,
+            has_images=has_images
         )
-

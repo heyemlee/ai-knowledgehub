@@ -455,7 +455,8 @@ Please return the {top_k} most relevant document numbers (sorted by relevance fr
         question: str,
         context: List[Dict[str, str]],
         temperature: float = 0.7,
-        max_tokens: int = 1000
+        max_tokens: int = 1000,
+        has_images: bool = False
     ):
         """
         流式生成回答（用于实时显示）
@@ -497,7 +498,8 @@ Please return the {top_k} most relevant document numbers (sorted by relevance fr
             question=question,
             context_text=context_text,
             core_keywords=core_keywords if core_keywords else None,
-            language=language
+            language=language,
+            has_images=has_images
         )
         
         try:
