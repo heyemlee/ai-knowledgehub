@@ -54,8 +54,8 @@ export default function LoginForm() {
   }
 
   return (
-    <div className="flex items-center justify-center min-h-screen bg-white p-4">
-      <div className="w-full max-w-md">
+    <div className="flex items-center justify-center h-screen bg-white p-4 overflow-hidden">
+      <div className="w-full max-w-md my-auto">
         {/* Logo 和标题 */}
         <div className="text-center mb-12">
           <h1 className="text-5xl font-bold mb-3 text-black">
