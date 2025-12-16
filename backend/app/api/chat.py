@@ -145,7 +145,7 @@ async def stream_answer(
             images = await image_retrieval_service.search_images(
                 db=db,
                 question=chat_request.question,
-                limit=3
+                limit=4
             )
             logger.info(f"检索到 {len(images)} 张相关图片")
         except Exception as e:
@@ -161,15 +161,25 @@ async def stream_answer(
                 question_language = detect_language(chat_request.question)
                 logger.info(f"检测到问题语言: {question_language}")
                 
-                if question_language == 'en':
-                    if images:
-                        error_msg = "No relevant documents found in the knowledge base, but here are some related images:"
+                # 检查是否是询问照片/图片的问题
+                photo_keywords = ['照片', '图片', 'photo', 'image', 'picture', 'pic']
+                is_asking_for_photos = any(keyword in chat_request.question.lower() for keyword in photo_keywords)
+                
+                if images:
+                    # 如果找到图片且用户在询问照片，则不显示任何文字，只返回图片
+                    if is_asking_for_photos:
+                        error_msg = ""
                     else:
+                        # 如果不是询问照片，显示简短提示
+                        if question_language == 'en':
+                            error_msg = "Here are some related images:"
+                        else:  # zh
+                            error_msg = "这是相关图片："
+                else:
+                    # 没有找到任何信息
+                    if question_language == 'en':
                         error_msg = "Sorry, no relevant information found in the knowledge base. Please upload relevant documents first."
-                else:  # zh
-                    if images:
-                        error_msg = "知识库中没有找到相关文档，但找到了一些相关图片："
-                    else:
+                    else:  # zh
                         error_msg = "抱歉，知识库中没有找到相关信息。请先上传相关文档到知识库。"
                 
                 full_answer = error_msg

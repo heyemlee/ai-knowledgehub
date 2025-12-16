@@ -179,9 +179,9 @@ Return only keywords, no other explanation:"""
         image_hint = ""
         if has_images:
             if language == 'zh':
-                image_hint = "\n\n**重要提示：系统已经为用户找到了相关图片。因此，即使文档信息不完整，也不要说\"未找到相关信息\"。用户将会看到相关图片。**"
+                image_hint = "\n\n**重要提示：系统已经为用户找到了相关图片。请注意：**\n- 不要说\"系统已找到图片\"或\"用户将看到图片\"等多余的话\n- 如果用户询问的是照片/图片，只需简短回答文档中的相关信息（如果有），不要重复说有图片\n- 保持回答简洁，让图片自己说话"
             else:
-                image_hint = "\n\n**Important Note: The system has found related images for the user. Therefore, even if document information is incomplete, do not say \"no relevant information found\". The user will see related images.**"
+                image_hint = "\n\n**Important Note: The system has found related images for the user. Please note:**\n- Do not say \"The system has found images\" or \"The user will see images\" or similar redundant phrases\n- If the user is asking for photos/images, just briefly answer with relevant information from documents (if any), don't repeat that there are images\n- Keep the answer concise and let the images speak for themselves"
         
         if language == 'zh':
             return f"""**任务：从以下文档片段中提取信息回答用户问题**
