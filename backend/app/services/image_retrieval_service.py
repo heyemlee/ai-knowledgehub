@@ -82,22 +82,14 @@ class ImageRetrievalService:
             # 按相似度排序
             similarities.sort(key=lambda x: x[1], reverse=True)
             
-            # 过滤低相似度的结果（阈值 0.5，降低以提高召回率）
-            threshold = 0.5
+            # 过滤低相似度的结果（精准匹配：阈值提高到 0.7）
+            threshold = 0.7
             filtered_similarities = [(img, sim) for img, sim in similarities if sim >= threshold]
             
             if not filtered_similarities:
                 logger.info(f"没有找到相似度 >= {threshold} 的图片，最高相似度: {similarities[0][1]:.4f}")
-                # 降低阈值到 0.4，返回所有相似度 >= 0.4 的图片
-                lower_threshold = 0.4
-                filtered_similarities = [(img, sim) for img, sim in similarities if sim >= lower_threshold]
-                
-                if not filtered_similarities:
-                    # 如果连 0.4 都没有，返回空
-                    logger.info(f"没有找到相似度 >= {lower_threshold} 的图片")
-                    return []
-                else:
-                    logger.info(f"使用降低的阈值 {lower_threshold}，找到 {len(filtered_similarities)} 张图片")
+                # 精准匹配：不再降级到更低的阈值，没有就是没有
+                return []
             
             # 构建返回结果
             result_images = []
