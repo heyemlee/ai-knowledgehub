@@ -10,6 +10,7 @@ from app.services.local_storage_service import storage_service
 from app.services.openai_service import openai_service
 from app.services.qdrant_service import qdrant_service
 from app.services.token_usage_service import token_usage_service
+from app.services.document_analysis_service import document_analysis_service
 from app.utils.document_parser import DocumentParser
 from app.utils.file_validator import validate_file, validate_file_size
 from app.utils.sanitizer import InputSanitizer
@@ -135,6 +136,14 @@ async def upload_document(
             metadata=metadata_list
         )
         
+        # 智能文档分析：提取标题、摘要、关键词
+        content_preview = "\n".join(chunks[:5]) if chunks else ""  # 取前5个chunk作为内容预览
+        doc_metadata = document_analysis_service.analyze_document(
+            filename=filename,
+            content_preview=content_preview
+        )
+        logger.info(f"文档分析结果: {doc_metadata.get('title')}")
+        
         db_document = Document(
             file_id=file_id,
             filename=filename,
@@ -142,14 +151,15 @@ async def upload_document(
             file_size=file_size,
             user_id=user_id,
             status="completed",
-            chunks_count=len(chunks)
+            chunks_count=len(chunks),
+            doc_metadata=doc_metadata  # 存储 AI 分析结果
         )
         
         db.add(db_document)
         await db.commit()
         await db.refresh(db_document)
         
-        logger.info(f"文档处理完成: {file_id}, 块数: {len(chunks)}")
+        logger.info(f"文档处理完成: {file_id}, 块数: {len(chunks)}, 标题: {doc_metadata.get('title')}")
         
         return DocumentUpload(
             file_id=file_id,

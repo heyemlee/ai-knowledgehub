@@ -8,6 +8,7 @@ import { isAdmin } from '@/lib/auth'
 import ConversationHistory from './ConversationHistory'
 import UserProfile from './UserProfile'
 import AdminPanel from './AdminPanel'
+import DocumentCard from './DocumentCard'
 import ReactMarkdown from 'react-markdown'
 import remarkGfm from 'remark-gfm'
 import { Send, LogOut, User, Settings, Menu, Copy, Check, Download } from 'lucide-react'
@@ -18,7 +19,8 @@ export default function ChatInterface() {
     role: 'user' | 'assistant';
     content: string;
     sources?: any[];
-    images?: any[];  // 新增：图片列表
+    images?: any[];  // 图片列表
+    documents?: any[];  // 新增：匹配的文档列表
   }>>([])
   const [input, setInput] = useState('')
   const [loading, setLoading] = useState(false)
@@ -93,7 +95,8 @@ export default function ChatInterface() {
     try {
       let fullAnswer = ''
       let finalSources: any[] | undefined = undefined
-      let finalImages: any[] | undefined = undefined  // 新增：图片数据
+      let finalImages: any[] | undefined = undefined
+      let finalDocuments: any[] | undefined = undefined  // 新增：文档数据
       let finalConversationId: string | null = null
 
       for await (const chunk of chatAPI.stream({
@@ -120,6 +123,11 @@ export default function ChatInterface() {
           finalImages = chunk.images
         }
 
+        // 新增：接收文档数据
+        if (chunk.documents) {
+          finalDocuments = chunk.documents
+        }
+
         if (chunk.conversation_id) {
           finalConversationId = chunk.conversation_id
           if (!conversationId) {
@@ -135,7 +143,8 @@ export default function ChatInterface() {
           role: 'assistant',
           content: fullAnswer,
           sources: finalSources,
-          images: finalImages,  // 新增：保存图片数据
+          images: finalImages,
+          documents: finalDocuments,  // 新增：保存文档数据
         },
       ])
       setRefreshHistory((prev) => prev + 1)
@@ -308,6 +317,18 @@ export default function ChatInterface() {
                         <Copy size={16} className="text-gray-600" />
                       )}
                     </button>
+
+                    {/* 新增：显示匹配的文档 */}
+                    {msg.documents && msg.documents.length > 0 && (
+                      <div className="mt-4 space-y-3">
+                        <p className="text-sm text-gray-600 font-medium">Related Documents:</p>
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                          {msg.documents.map((doc: any, docIdx: number) => (
+                            <DocumentCard key={docIdx} document={doc} />
+                          ))}
+                        </div>
+                      </div>
+                    )}
 
                     {/* 显示图片 */}
                     {msg.images && msg.images.length > 0 && (

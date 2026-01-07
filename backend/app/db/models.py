@@ -1,7 +1,7 @@
 """
 数据库模型定义
 """
-from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Table
+from sqlalchemy import Column, Integer, String, Boolean, DateTime, ForeignKey, Text, Table, JSON
 from sqlalchemy.orm import relationship
 from sqlalchemy.sql import func
 from app.db.database import Base
@@ -48,6 +48,9 @@ class Document(Base):
     user_id = Column(Integer, ForeignKey("users.id"), nullable=False)
     status = Column(String(50), default="completed", nullable=False)
     chunks_count = Column(Integer, default=0, nullable=False)
+    # 智能文档检索：AI 提取的元数据
+    # 格式: {"title": "...", "summary": "...", "keywords": [...], "category": "..."}
+    doc_metadata = Column(JSON, nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now(), nullable=False)
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now(), nullable=False)
     

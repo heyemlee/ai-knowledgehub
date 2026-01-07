@@ -178,6 +178,17 @@ class MessageResponse(BaseModel):
         from_attributes = True
 
 
+class DocumentReference(BaseModel):
+    """文档引用响应 - 用于智能文档检索"""
+    file_id: str
+    filename: str
+    title: Optional[str] = None
+    summary: Optional[str] = None
+    preview_url: str
+    download_url: str
+    relevance_score: Optional[float] = None
+
+
 # ==============================
 # 图片相关 Schemas
 # ==============================
