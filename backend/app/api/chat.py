@@ -12,6 +12,7 @@ from app.services.qdrant_service import qdrant_service
 from app.services.token_usage_service import token_usage_service
 from app.services.cleanup_service import cleanup_old_conversations_for_user
 from app.services.image_retrieval_service import image_retrieval_service
+from app.services.document_retrieval_service import document_retrieval_service
 from app.middleware.rate_limit import limiter
 from app.core.constants import RateLimitConfig, TokenLimitConfig, SearchConfig, ProcessingConfig, ConversationConfig
 from app.core.config import settings
@@ -137,7 +138,8 @@ async def stream_answer(
         
         full_answer = ""
         sources = []
-        images = []  # 新增：相关图片列表
+        images = []  # 相关图片列表
+        documents = []  # 新增：匹配的完整文档列表
         token_usage = None
         
         # 提前检索相关图片（在生成答案之前）
@@ -152,6 +154,18 @@ async def stream_answer(
             logger.warning(f"图片检索失败: {e}")
             images = []
         
+        # 新增：检索匹配的完整文档（用于返回 PDF 预览）
+        try:
+            documents = await document_retrieval_service.search_documents(
+                db=db,
+                question=chat_request.question,
+                limit=3
+            )
+            logger.info(f"检索到 {len(documents)} 个匹配文档")
+        except Exception as e:
+            logger.warning(f"文档检索失败: {e}")
+            documents = []
+        
         
         async def generate():
             nonlocal full_answer, token_usage
@@ -165,7 +179,18 @@ async def stream_answer(
                 photo_keywords = ['照片', '图片', 'photo', 'image', 'picture', 'pic']
                 is_asking_for_photos = any(keyword in chat_request.question.lower() for keyword in photo_keywords)
                 
-                if images:
+                # 新增：检查是否有匹配的文档
+                if documents:
+                    # 找到匹配的文档，返回文档引用
+                    doc_titles = ', '.join([d.get('title', d.get('filename', '')) for d in documents[:2]])
+                    if question_language == 'en':
+                        error_msg = f"Found relevant document(s): {doc_titles}. Click to preview or download."
+                    else:
+                        error_msg = f"找到相关文档：{doc_titles}。点击预览或下载。"
+                    full_answer = error_msg
+                    yield f"data: {json.dumps({'content': error_msg, 'done': True, 'documents': documents, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
+                    return
+                elif images:
                     # 如果找到图片且用户在询问照片，则不显示任何文字，只返回图片
                     if is_asking_for_photos:
                         error_msg = ""
@@ -183,7 +208,7 @@ async def stream_answer(
                         error_msg = "抱歉，知识库中没有找到相关信息。请先上传相关文档到知识库。"
                 
                 full_answer = error_msg
-                yield f"data: {json.dumps({'content': error_msg, 'done': True, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
+                yield f"data: {json.dumps({'content': error_msg, 'done': True, 'documents': documents, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
                 return
             
             try:
@@ -231,7 +256,7 @@ async def stream_answer(
                         "metadata": metadata
                     })
             
-            yield f"data: {json.dumps({'content': '', 'done': True, 'sources': sources, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
+            yield f"data: {json.dumps({'content': '', 'done': True, 'sources': sources, 'documents': documents, 'images': images, 'conversation_id': conversation_id_str}, ensure_ascii=False)}\n\n"
 
             
             if user_id and conversation and full_answer:

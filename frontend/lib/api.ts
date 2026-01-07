@@ -104,7 +104,8 @@ export const chatAPI = {
     content: string;
     done: boolean;
     sources?: any[];
-    images?: any[];  // 新增：图片列表
+    images?: any[];  // 图片列表
+    documents?: any[];  // 新增：匹配的文档列表
     conversation_id?: string;
     error?: boolean
   }> {
