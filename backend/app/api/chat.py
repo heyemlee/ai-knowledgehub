@@ -162,6 +162,14 @@ async def stream_answer(
                 limit=3
             )
             logger.info(f"检索到 {len(documents)} 个匹配文档")
+            
+            # 精准匹配：如果找到高相关度的文档，不显示图片以避免混淆
+            if documents and len(documents) > 0:
+                # 检查是否有高相关度的文档（> 0.7）
+                high_relevance = any(d.get('relevance_score', 0) >= 0.7 for d in documents)
+                if high_relevance:
+                    logger.info("找到高相关度文档，清除图片结果以确保精准匹配")
+                    images = []
         except Exception as e:
             logger.warning(f"文档检索失败: {e}")
             documents = []

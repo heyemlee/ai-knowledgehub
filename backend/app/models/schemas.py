@@ -280,6 +280,22 @@ class ImageListResponse(BaseModel):
     page_size: int
 
 
+class BatchUploadResult(BaseModel):
+    """单张图片批量上传结果"""
+    filename: str
+    success: bool
+    error: Optional[str] = None
+    image_id: Optional[int] = None
+
+
+class BatchUploadResponse(BaseModel):
+    """批量上传响应"""
+    total: int                         # 总图片数
+    success_count: int                 # 成功数
+    failed_count: int                  # 失败数
+    results: List[BatchUploadResult]   # 详细结果
+
+
 class ChatResponseWithImages(BaseModel):
     """问答响应（包含图片）"""
     answer: str
