@@ -71,53 +71,33 @@ export default function DocumentCard({ document }: DocumentCardProps) {
     }
 
     return (
-        <div className="group bg-white border border-gray-200 rounded-xl p-4 hover:border-gray-400 hover:shadow-md transition-all">
-            {/* 文档图标和标题 */}
-            <div className="flex items-start gap-3 mb-3">
-                <div className="flex-shrink-0 w-12 h-12 bg-red-50 rounded-lg flex items-center justify-center">
-                    <FileText size={24} className="text-red-600" />
+        <div className="group bg-white border border-gray-200 rounded-xl p-3 hover:border-gray-400 hover:shadow-md transition-all">
+            {/* 文档图标和文件名 */}
+            <div className="flex items-center gap-3">
+                <div className="flex-shrink-0 w-10 h-10 bg-red-50 rounded-lg flex items-center justify-center">
+                    <FileText size={20} className="text-red-600" />
                 </div>
-                <div className="flex-1 min-w-0">
-                    <h3 className="font-semibold text-gray-900 truncate">
-                        {document.title || document.filename}
-                    </h3>
-                    <p className="text-sm text-gray-500 truncate">
-                        {document.filename}
-                    </p>
+                <h3 className="flex-1 font-medium text-gray-900 truncate text-sm">
+                    {document.filename}
+                </h3>
+                {/* 操作按钮 */}
+                <div className="flex gap-1">
+                    <button
+                        onClick={handlePreview}
+                        className="p-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors"
+                        title="Preview"
+                    >
+                        <Eye size={16} />
+                    </button>
+                    <button
+                        onClick={handleDownload}
+                        className="p-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors"
+                        title="Download"
+                    >
+                        <Download size={16} />
+                    </button>
                 </div>
             </div>
-
-            {/* 摘要 */}
-            {document.summary && (
-                <p className="text-sm text-gray-600 mb-4 line-clamp-2">
-                    {document.summary}
-                </p>
-            )}
-
-            {/* 操作按钮 */}
-            <div className="flex gap-2">
-                <button
-                    onClick={handlePreview}
-                    className="flex-1 flex items-center justify-center gap-2 px-4 py-2 bg-black text-white rounded-lg hover:bg-gray-800 transition-colors text-sm font-medium"
-                >
-                    <Eye size={16} />
-                    Preview
-                </button>
-                <button
-                    onClick={handleDownload}
-                    className="flex items-center justify-center gap-2 px-4 py-2 border border-gray-200 text-gray-700 rounded-lg hover:bg-gray-50 transition-colors text-sm font-medium"
-                >
-                    <Download size={16} />
-                    Download
-                </button>
-            </div>
-
-            {/* 相关度（可选显示） */}
-            {document.relevance_score && document.relevance_score > 0 && (
-                <div className="mt-2 text-xs text-gray-400 text-right">
-                    Relevance: {Math.round(document.relevance_score * 100)}%
-                </div>
-            )}
         </div>
     )
 }
